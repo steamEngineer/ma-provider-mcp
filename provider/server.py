@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from .constants import (
+    CONF_EXTRA_ALLOWED_ORIGINS,
     CONF_MOUNT_PATH,
     CONF_REQUIRE_AUTH,
     DEFAULT_MOUNT_PATH,
@@ -112,7 +113,10 @@ class MCPServerRuntime:
         self._apply_tag_filter(mcp, enabled_tags(self._config))
 
         self._mcp = mcp
-        self._unmount = await mount_into_mass(self._mass, mcp, self._mount_path)
+        extra_origins = str(self._config.get_value(CONF_EXTRA_ALLOWED_ORIGINS) or "")
+        self._unmount = await mount_into_mass(
+            self._mass, mcp, self._mount_path, extra_origins_csv=extra_origins
+        )
         self._logger.debug(
             "MCP runtime started: mount=%s, auth=%s, tags=%d",
             self._mount_path,

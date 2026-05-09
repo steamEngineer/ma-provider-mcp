@@ -126,17 +126,30 @@ async def mount_into_mass(
     mass: MusicAssistant,
     mcp: Any,
     mount_path: str = "/mcp/v1",
+    extra_origins_csv: str = "",
 ) -> Callable[[], None]:
     """Register the FastMCP streamable-HTTP ASGI app under MA's webserver.
 
     :param mass: MusicAssistant instance.
     :param mcp: FastMCP server instance whose ``http_app`` is exposed.
     :param mount_path: Path prefix on the MA webserver (default ``/mcp/v1``).
+    :param extra_origins_csv: Comma-separated additional ``Origin`` values to
+        accept beyond the auto-derived defaults (loopback + base_url +
+        publish_ip). Use for reverse-proxy hostnames or HA ingress.
     :return: Callable that, when invoked, unregisters the route.
     """
     asgi_app = _build_asgi_app(mcp)
+    allowlist = _compute_origin_allowlist(mass, extra_origins_csv)
 
     async def handler(request: web.Request) -> web.StreamResponse:
+        origin = request.headers.get("Origin")
+        if not _is_origin_allowed(origin, allowlist):
+            LOGGER.warning(
+                "MCP: rejected request with Origin=%r from %s (not in allowlist)",
+                origin,
+                request.remote,
+            )
+            return web.Response(status=403, text="Forbidden Origin")
         return await _asgi_to_aiohttp(asgi_app, request, strip_prefix=mount_path)
 
     return mass.webserver.register_dynamic_route(f"{mount_path}/*", handler)
