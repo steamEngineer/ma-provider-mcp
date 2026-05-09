@@ -9,12 +9,19 @@ MA's main webserver is aiohttp. This bridge translates a single aiohttp
 Streaming responses (SSE / chunked) are passed through verbatim so MCP
 keep-alive heartbeats and tool-progress events reach the client without
 buffering.
+
+A second helper (:func:`mount_well_known`) registers a sibling route at
+``/.well-known/oauth-protected-resource[/<mcp-path>]`` that serves the RFC
+9728 protected-resource-metadata document — pointed to by FastMCP's
+``WWW-Authenticate`` 401 header, so spec-compliant MCP clients (Claude
+Desktop, Codex, ChatGPT Apps SDK) can discover the authorization server.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
@@ -153,6 +160,87 @@ async def mount_into_mass(
         return await _asgi_to_aiohttp(asgi_app, request, strip_prefix=mount_path)
 
     return mass.webserver.register_dynamic_route(f"{mount_path}/*", handler)
+
+
+def build_protected_resource_metadata(
+    *,
+    resource_uri: str,
+    authorization_servers: list[str],
+    scopes_supported: list[str] | None = None,
+    resource_name: str | None = None,
+) -> dict[str, Any]:
+    """Construct the RFC 9728 OAuth 2.0 Protected Resource Metadata document.
+
+    :param resource_uri: Canonical URI of this MCP server (matches the ``aud``
+        claim in tokens issued for it).
+    :param authorization_servers: Issuer URLs of authorization servers that
+        produce valid tokens for ``resource_uri``.
+    :param scopes_supported: Optional list of scopes advertised to clients.
+    :param resource_name: Human-readable label.
+    """
+    metadata: dict[str, Any] = {
+        "resource": resource_uri,
+        "authorization_servers": list(authorization_servers),
+        "bearer_methods_supported": ["header"],
+    }
+    if scopes_supported:
+        metadata["scopes_supported"] = list(scopes_supported)
+    if resource_name:
+        metadata["resource_name"] = resource_name
+    return metadata
+
+
+async def mount_well_known(
+    mass: MusicAssistant,
+    *,
+    mount_path: str,
+    resource_uri: str,
+    authorization_servers: list[str],
+    scopes_supported: list[str] | None = None,
+    resource_name: str | None = None,
+) -> Callable[[], None]:
+    """Register the Protected Resource Metadata endpoint on MA's webserver.
+
+    Two paths are bound, both returning the same JSON:
+
+    * ``/.well-known/oauth-protected-resource/<mount_path-without-leading-slash>``
+      — the path FastMCP advertises in ``WWW-Authenticate`` 401 responses.
+    * ``/.well-known/oauth-protected-resource`` — root fallback (RFC 9728
+      §3.1 second form), so clients that strip the path component still find
+      the document.
+
+    :return: Callable that unregisters both routes when invoked.
+    """
+    metadata = build_protected_resource_metadata(
+        resource_uri=resource_uri,
+        authorization_servers=authorization_servers,
+        scopes_supported=scopes_supported,
+        resource_name=resource_name,
+    )
+    body = json.dumps(metadata).encode()
+
+    async def handler(_request: web.Request) -> web.Response:
+        return web.Response(
+            body=body,
+            content_type="application/json",
+            headers={"Cache-Control": "no-store"},
+        )
+
+    suffix = mount_path.lstrip("/")
+    paths = [
+        f"/.well-known/oauth-protected-resource/{suffix}",
+        "/.well-known/oauth-protected-resource",
+    ]
+    unregister_fns: list[Callable[[], None]] = [
+        mass.webserver.register_dynamic_route(p, handler, method="GET") for p in paths
+    ]
+
+    def _unregister_all() -> None:
+        for fn in unregister_fns:
+            with contextlib.suppress(Exception):
+                fn()
+
+    return _unregister_all
 
 
 def _build_asgi_app(mcp: Any) -> Any:

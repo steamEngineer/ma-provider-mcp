@@ -11,15 +11,20 @@ from provider.auth import MASTokenVerifier
 
 @pytest.mark.asyncio
 async def test_valid_token_returns_access_token(mock_mass: MagicMock, mock_user: MagicMock) -> None:
-    """A valid token yields an AccessToken with the user's role mapped to scopes."""
+    """A valid token yields an AccessToken bound to the canonical resource URI."""
     mock_mass.webserver.auth.authenticate_with_token = AsyncMock(return_value=mock_user)
-    verifier = MASTokenVerifier(mock_mass)
+    verifier = MASTokenVerifier(
+        mock_mass,
+        base_url="http://localhost:8095",
+        public_resource_uri="http://localhost:8095/mcp/v1",
+    )
 
     token = await verifier.verify_token("valid-token")
 
     assert token is not None
     assert token.client_id == "u1"
-    assert token.scopes == ["admin"]
+    assert token.scopes == []
+    assert token.resource == "http://localhost:8095/mcp/v1"
     assert token.token == "valid-token"
 
 

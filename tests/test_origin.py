@@ -13,7 +13,9 @@ from provider.http_bridge import (
     _compute_origin_allowlist,
     _is_origin_allowed,
     _normalize_origin,
+    build_protected_resource_metadata,
     mount_into_mass,
+    mount_well_known,
 )
 
 
@@ -188,6 +190,81 @@ async def test_bridge_allows_no_origin(bridge_client: TestClient) -> None:
     """Requests without ``Origin`` header (curl/CLI) pass through unchanged."""
     resp = await bridge_client.post("/mcp/v1/")
     assert resp.status == 200
+
+
+def test_build_protected_resource_metadata_minimal() -> None:
+    """RFC 9728 metadata always carries resource + authorization_servers + bearer methods."""
+    meta = build_protected_resource_metadata(
+        resource_uri="http://localhost:8095/mcp/v1",
+        authorization_servers=["http://localhost:8095"],
+    )
+    assert meta == {
+        "resource": "http://localhost:8095/mcp/v1",
+        "authorization_servers": ["http://localhost:8095"],
+        "bearer_methods_supported": ["header"],
+    }
+
+
+def test_build_protected_resource_metadata_full() -> None:
+    """Optional fields scopes_supported / resource_name appear when provided."""
+    meta = build_protected_resource_metadata(
+        resource_uri="http://localhost:8095/mcp/v1",
+        authorization_servers=["http://localhost:8095"],
+        scopes_supported=["query:library", "control:playback"],
+        resource_name="Music Assistant MCP",
+    )
+    assert meta["scopes_supported"] == ["query:library", "control:playback"]
+    assert meta["resource_name"] == "Music Assistant MCP"
+
+
+class _CapturingWebserver:
+    """Captures every dynamic-route registration so a test can mount its handlers."""
+
+    def __init__(self) -> None:
+        self.routes: list[tuple[str, Any, str]] = []
+        self.base_url = "http://localhost:8095"
+        self.publish_ip = "127.0.0.1"
+
+    def register_dynamic_route(self, path: str, handler: Any, method: str = "*") -> Any:
+        self.routes.append((path, handler, method))
+        return lambda path=path: self.routes.remove(
+            next((r for r in self.routes if r[0] == path), (path, None, method))
+        )
+
+
+async def test_mount_well_known_serves_metadata() -> None:
+    """The well-known route returns the RFC 9728 JSON document for both URI forms."""
+    fake_ws = _CapturingWebserver()
+    mass = SimpleNamespace(webserver=fake_ws)
+    unmount = await mount_well_known(
+        mass,
+        mount_path="/mcp/v1",
+        resource_uri="http://localhost:8095/mcp/v1",
+        authorization_servers=["http://localhost:8095"],
+        scopes_supported=["query:library"],
+        resource_name="Music Assistant MCP",
+    )
+
+    paths = [r[0] for r in fake_ws.routes]
+    assert "/.well-known/oauth-protected-resource/mcp/v1" in paths
+    assert "/.well-known/oauth-protected-resource" in paths
+
+    app = web.Application()
+    for path, handler, _method in fake_ws.routes:
+        app.router.add_get(path, handler)
+    async with TestClient(TestServer(app)) as client:
+        for path in paths:
+            resp = await client.get(path)
+            assert resp.status == 200
+            assert resp.headers["content-type"].startswith("application/json")
+            doc = await resp.json()
+            assert doc["resource"] == "http://localhost:8095/mcp/v1"
+            assert doc["authorization_servers"] == ["http://localhost:8095"]
+            assert doc["bearer_methods_supported"] == ["header"]
+            assert doc["scopes_supported"] == ["query:library"]
+            assert doc["resource_name"] == "Music Assistant MCP"
+
+    unmount()
 
 
 async def test_bridge_with_extra_origins() -> None:

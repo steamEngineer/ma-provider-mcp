@@ -83,7 +83,17 @@ class MCPServerRuntime:
         )
 
         require_auth = bool(self._config.get_value(CONF_REQUIRE_AUTH))
-        verifier = MASTokenVerifier(self._mass) if require_auth else None
+        base_url = str(getattr(self._mass.webserver, "base_url", "") or "").rstrip("/")
+        public_resource_uri = f"{base_url}{self._mount_path}" if base_url else None
+        verifier = (
+            MASTokenVerifier(
+                self._mass,
+                base_url=base_url or None,
+                public_resource_uri=public_resource_uri,
+            )
+            if require_auth
+            else None
+        )
 
         mcp = FastMCP(
             name="music-assistant",
@@ -117,6 +127,23 @@ class MCPServerRuntime:
         self._unmount = await mount_into_mass(
             self._mass, mcp, self._mount_path, extra_origins_csv=extra_origins
         )
+
+        # Publish RFC 9728 protected-resource metadata at the well-known URL
+        # advertised by FastMCP in WWW-Authenticate. Skipped when require_auth
+        # is off (no metadata to serve) or base_url is missing (no canonical URI).
+        self._unmount_well_known: Callable[[], None] | None = None
+        if require_auth and public_resource_uri:
+            from .http_bridge import mount_well_known  # noqa: PLC0415
+
+            self._unmount_well_known = await mount_well_known(
+                self._mass,
+                mount_path=self._mount_path,
+                resource_uri=public_resource_uri,
+                authorization_servers=[base_url],
+                scopes_supported=[str(t) for t in enabled_tags(self._config)],
+                resource_name="Music Assistant MCP",
+            )
+
         self._logger.debug(
             "MCP runtime started: mount=%s, auth=%s, tags=%d",
             self._mount_path,
@@ -132,6 +159,12 @@ class MCPServerRuntime:
             except Exception:
                 self._logger.exception("Failed to unregister MCP route")
             self._unmount = None
+        if getattr(self, "_unmount_well_known", None) is not None:
+            try:
+                self._unmount_well_known()  # type: ignore[misc]
+            except Exception:
+                self._logger.exception("Failed to unregister well-known route")
+            self._unmount_well_known = None
         self._mcp = None
 
     async def apply_permission_change(self, new_config: ProviderConfig) -> None:
