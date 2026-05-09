@@ -37,7 +37,7 @@ def build_playlists_server(
     async def create_playlist(name: str, provider_instance_id: str | None = None) -> PlaylistBrief:
         """Create a new playlist on a music provider."""
         playlist = await mass.music.playlists.create_playlist(
-            name, provider_instance_id_or_domain=provider_instance_id
+            name, provider_instance_or_domain=provider_instance_id
         )
         return to_brief_playlist(playlist)
 
@@ -130,6 +130,8 @@ def build_playlists_server(
             f"Remove {len(positions)} track(s) from playlist {playlist_id!r}?",
             enabled=require_confirmation,
         )
-        await mass.music.playlists.remove_playlist_tracks(playlist_id, positions)
+        # MA's PlaylistController expects an immutable tuple, not a list, so
+        # callers can't accidentally mutate it mid-removal.
+        await mass.music.playlists.remove_playlist_tracks(playlist_id, tuple(positions))
 
     return sub

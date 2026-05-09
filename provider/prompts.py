@@ -5,6 +5,10 @@ These prompts hand the LLM a small, opinionated playbook for common tasks
 "build a party playlist") so an LLM client can chain MCP tools without
 re-deriving the workflow each time.
 """
+# FastMCP's @mcp.prompt / @mcp.resource decorators don't expose static return
+# types yet, which makes mypy treat every wrapped function as "untyped" under
+# the strict upstream config. The functions themselves are fully annotated.
+# mypy: disable-error-code=untyped-decorator
 
 from __future__ import annotations
 

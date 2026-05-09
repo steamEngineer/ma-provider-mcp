@@ -51,7 +51,9 @@ async def confirm_or_raise(
     if not enabled or ctx is None:
         return
     try:
-        result = await ctx.elicit(prompt, response_type=bool)
+        # ctx.elicit's overloads in older mypy stubs don't recognize ``bool``
+        # as a valid scalar response_type — runtime behaviour is fine.
+        result = await ctx.elicit(prompt, response_type=bool)  # type: ignore[arg-type]
     except NotImplementedError:
         return
     action = getattr(result, "action", None)

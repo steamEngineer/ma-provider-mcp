@@ -21,7 +21,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from fastmcp.server.auth import TokenVerifier
-from mcp.server.auth.provider import AccessToken
+from fastmcp.server.auth.auth import AccessToken
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant

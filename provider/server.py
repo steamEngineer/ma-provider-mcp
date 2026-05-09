@@ -58,6 +58,10 @@ class MCPServerRuntime:
         self._mount_path: str = str(config.get_value(CONF_MOUNT_PATH) or DEFAULT_MOUNT_PATH)
         self._mcp: Any = None
         self._unmount: Callable[[], None] | None = None
+        self._unmount_well_known: Callable[[], None] | None = None
+        # Mutable so apply_permission_change can hot-swap the allowed-tag set
+        # without re-instantiating the TagFilterMiddleware closure.
+        self._allowed_tags: set[str] = set()
 
     @property
     def public_url(self) -> str:
@@ -147,7 +151,6 @@ class MCPServerRuntime:
         # Publish RFC 9728 protected-resource metadata at the well-known URL
         # advertised by FastMCP in WWW-Authenticate. Skipped when require_auth
         # is off (no metadata to serve) or base_url is missing (no canonical URI).
-        self._unmount_well_known: Callable[[], None] | None = None
         if require_auth and public_resource_uri:
             from .http_bridge import mount_well_known  # noqa: PLC0415
 
@@ -227,10 +230,10 @@ class MCPServerRuntime:
         """Install the tag-filter middleware on the given FastMCP server."""
         from .middleware import TagFilterMiddleware  # noqa: PLC0415
 
-        # Snapshot tags into a tuple captured by the closure below. The closure
-        # form lets us swap the allowed set later via apply_permission_change
-        # without re-instantiating the middleware (single source of truth).
-        self._allowed_tags: set[str] = {str(t) for t in allowed}
+        # Snapshot tags into the closure-captured set declared in __init__.
+        # apply_permission_change mutates the same set later, so the
+        # middleware sees the new permissions without rebuilding FastMCP.
+        self._allowed_tags = {str(t) for t in allowed}
 
         async def lookup(kind: str, key: str) -> set[str] | None:
             """Resolve component name/URI back to its tag set via FastMCP public API.

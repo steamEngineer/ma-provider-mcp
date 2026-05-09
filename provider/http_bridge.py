@@ -224,27 +224,25 @@ async def mount_well_known(
         runtime rebuild — the body is regenerated on each request.
     :return: Callable that unregisters both routes when invoked.
     """
-    is_dynamic = callable(scopes_supported)
+    def _resolve_scopes() -> list[str] | None:
+        if callable(scopes_supported):
+            return scopes_supported()
+        return scopes_supported
 
     def _build_body() -> bytes:
-        scopes = scopes_supported() if is_dynamic else scopes_supported  # type: ignore[operator]
         metadata = build_protected_resource_metadata(
             resource_uri=resource_uri,
             authorization_servers=authorization_servers,
-            scopes_supported=scopes,
+            scopes_supported=_resolve_scopes(),
             resource_name=resource_name,
         )
         return json.dumps(metadata).encode()
 
-    # Static scopes: pre-compute once (faster). Dynamic scopes: regenerate per
-    # request so hot-swapped permissions show up immediately.
-    cached_body: bytes | None = None if is_dynamic else _build_body()
-
     async def handler(_request: web.Request) -> web.Response:
-        body = _build_body() if is_dynamic else cached_body
-        assert body is not None
+        # Re-render per request — sub-ms json.dumps — so a closure over
+        # self._config in MCPServerRuntime reflects permission hot-swaps.
         return web.Response(
-            body=body,
+            body=_build_body(),
             content_type="application/json",
             headers={"Cache-Control": "no-store"},
         )
@@ -278,7 +276,7 @@ def _build_asgi_app(mcp: Any) -> Any:
     raise RuntimeError(msg)
 
 
-async def _asgi_to_aiohttp(
+async def _asgi_to_aiohttp(  # noqa: PLR0915 - single-purpose ASGI bridge, splitting harms readability
     asgi_app: Any,
     request: web.Request,
     strip_prefix: str = "",
@@ -350,6 +348,7 @@ async def _asgi_to_aiohttp(
     response = response_state["response"]
     if response is None:
         return web.Response(status=204)
+    assert isinstance(response, web.StreamResponse)
     return response
 
 

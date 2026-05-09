@@ -87,6 +87,10 @@ async def test_no_confirmation_when_disabled(mock_mass: MagicMock) -> None:
 
 async def test_remove_from_library_confirms(mock_mass: MagicMock) -> None:
     """media.remove_from_library also triggers elicitation."""
+    # MA's MusicController takes (media_type, library_item_id), not a URI —
+    # the tool resolves the URI via get_item_by_uri first.
+    resolved = MagicMock(media_type=MagicMock(), item_id=42)
+    mock_mass.music.get_item_by_uri = AsyncMock(return_value=resolved)
     mock_mass.music.remove_item_from_library = AsyncMock()
     mcp = _server(mock_mass, require_confirmation=True)
 
@@ -94,4 +98,7 @@ async def test_remove_from_library_confirms(mock_mass: MagicMock) -> None:
         await client.call_tool(
             "media_remove_from_library", {"uri": "lib://t/42"}
         )
-    mock_mass.music.remove_item_from_library.assert_awaited_once_with("lib://t/42")
+    mock_mass.music.get_item_by_uri.assert_awaited_once_with("lib://t/42")
+    mock_mass.music.remove_item_from_library.assert_awaited_once_with(
+        resolved.media_type, 42
+    )

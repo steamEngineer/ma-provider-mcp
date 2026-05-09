@@ -1,5 +1,6 @@
 """URI-addressable read-only player and queue resources."""
 # ruff: noqa: TID252  -- relative imports are the canonical MA-provider pattern.
+# mypy: disable-error-code=untyped-decorator  -- @mcp.resource is untyped upstream.
 
 from __future__ import annotations
 
