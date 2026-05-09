@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] — 2026-05-10
+
+### Fixed
+- **First MCP request crashed with ``Task group is not initialized``.**
+  The bridge dispatched ASGI requests to the FastMCP app but never sent
+  the ASGI ``lifespan.startup`` event, so FastMCP's
+  ``StreamableHTTPSessionManager`` task group never entered its
+  ``run()`` loop. Now ``mount_into_mass`` runs the ASGI lifespan as a
+  background task, awaits the ``startup.complete`` ack before returning,
+  and emits ``shutdown`` on unmount. Fixes runtime errors visible in MA
+  logs when a real client (Claude Code etc.) connects.
+
 ## [0.2.2] — 2026-05-10
 
 ### Fixed
