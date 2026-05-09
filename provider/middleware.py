@@ -35,7 +35,7 @@ ComponentKind = Literal["tool", "resource", "prompt"]
 TagsLookup = Callable[[ComponentKind, str], Awaitable[set[str] | None]]
 
 
-class TagFilterMiddleware(Middleware):  # type: ignore[misc]
+class TagFilterMiddleware(Middleware):  # type: ignore[misc, unused-ignore]
     """Hide tools, resources, and prompts whose tags are not in ``allowed_tags``.
 
     ``Middleware`` is typed as ``Any`` upstream; under
