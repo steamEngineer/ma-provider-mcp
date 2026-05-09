@@ -95,7 +95,7 @@ upstream PR submission run automatically through `ma-provider-tools`
 workflows (`sync-to-fork.yml`, `upstream-pr.yml`).
 
 This provider is intended to be inlined into
-`music_assistant/providers/mcp_server` upstream eventually — that is the
+`music_assistant/providers/fastmcp_server` upstream eventually — that is the
 target shape, not a possibility. Any code that lints / type-checks here
 must lint / type-check identically upstream.
 

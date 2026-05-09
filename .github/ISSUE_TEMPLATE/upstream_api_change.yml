@@ -1,5 +1,5 @@
 name: Upstream API Change
-description: Report a breaking change in the upstream API used by the mcp_server provider
+description: Report a breaking change in the upstream API used by the fastmcp_server provider
 labels: ["incident:upstream", "priority:high"]
 body:
   - type: markdown
@@ -27,7 +27,7 @@ body:
   - type: textarea
     id: impact
     attributes:
-      label: Impact on mcp_server provider
+      label: Impact on fastmcp_server provider
       description: Which provider features are broken or affected?
     validations:
       required: true

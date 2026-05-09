@@ -14,4 +14,4 @@ jobs:
   check:
     uses: trudenboy/ma-provider-tools/.github/workflows/reusable-check-config-sync.yml@main
     with:
-      domain: mcp_server
+      domain: fastmcp_server

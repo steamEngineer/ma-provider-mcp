@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug in the mcp_server provider
+description: Report a bug in the fastmcp_server provider
 labels: ["incident:bug", "priority:medium"]
 body:
   - type: markdown
