@@ -162,7 +162,6 @@ async def _echo_asgi(scope: dict, receive: Any, send: Any) -> None:
             elif msg["type"] == "lifespan.shutdown":
                 await send({"type": "lifespan.shutdown.complete"})
                 return
-        return
     await send({"type": "http.response.start", "status": 200, "headers": []})
     await send({"type": "http.response.body", "body": b"OK"})
 
