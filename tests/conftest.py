@@ -5,6 +5,11 @@ logic (URI parsing, tag mapping, config entries shape) or use ``MagicMock``
 for ``mass``. Integration-level tests that need a real MA stack are marked
 with ``@pytest.mark.integration`` and skipped by default.
 """
+# ruff: noqa: D401, PLR0915
+#   D401: fixture docstrings describe *what is returned* ("A stub …"), not
+#         imperative actions; rephrasing to "Build / Return …" hurts grep-ability.
+#   PLR0915: ``mock_mass`` builds a tall MagicMock surface — splitting it across
+#            helpers obscures the test contract.
 
 from __future__ import annotations
 

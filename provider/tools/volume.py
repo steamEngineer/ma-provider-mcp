@@ -1,4 +1,5 @@
 """Volume control: set, up/down, mute, group volume."""
+# ruff: noqa: TID252  -- relative imports are the canonical MA-provider pattern.
 
 from __future__ import annotations
 

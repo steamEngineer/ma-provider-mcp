@@ -1,4 +1,7 @@
 """MCP resource registration entry point."""
+# Relative imports are the canonical pattern across MA providers — sync-to-fork
+# preserves them verbatim, so disable TID252 file-wide here.
+# ruff: noqa: TID252
 
 from __future__ import annotations
 

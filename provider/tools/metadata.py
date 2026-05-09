@@ -1,4 +1,5 @@
 """Metadata: lyrics, recommendations, similar tracks, refresh."""
+# ruff: noqa: TID252  -- relative imports are the canonical MA-provider pattern.
 
 from __future__ import annotations
 
