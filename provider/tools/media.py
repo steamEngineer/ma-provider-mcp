@@ -23,19 +23,14 @@ async def _resolve_uri(mass: MusicAssistant, uri: str) -> Any:
     expect a resolved (media_type, library_item_id) pair or a typed media
     object — not a raw URI string. This helper centralises the lookup.
     """
-    # ``get_item_by_uri`` is typed as returning the item without an Optional in
-    # MA core, but in practice it can raise on missing entries. We catch both
-    # the typed-error path (exception) and the None fallback some adapters
-    # take, surfacing a clean ToolError either way.
+    # MA's ``get_item_by_uri`` is typed as returning a MediaItem (no Optional);
+    # missing entries raise instead. Normalise to a ToolError for a consistent
+    # tool-surface error path.
     try:
-        item = await mass.music.get_item_by_uri(uri)
+        return await mass.music.get_item_by_uri(uri)
     except Exception as exc:
         msg = f"Item not found for URI: {uri!r} ({exc})"
         raise ToolError(msg) from exc
-    if item is None:  # type: ignore[unreachable]
-        msg = f"Item not found for URI: {uri!r}"
-        raise ToolError(msg)  # type: ignore[unreachable]
-    return item
 
 
 def build_media_server(
