@@ -12,33 +12,51 @@ FastMCP server), and applies the rule:
 * a component with **at least one** allowed tag is exposed
 * a component with **no** tags is exposed (treat as always-on infrastructure)
 * a component whose tags are **all** disabled is hidden / blocked
+
+Listings are filtered post-hoc; direct invocations (``tools/call``,
+``resources/read``, ``prompts/get``) look the component up by name/URI and
+apply the same rule. A client that cached a tool name from an earlier
+permission set therefore cannot reach a now-disabled tool.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING, Any, Literal
 
+from fastmcp.exceptions import NotFoundError, ToolError
 from fastmcp.server.middleware import Middleware
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from fastmcp.server.middleware.middleware import CallNext, MiddlewareContext
+
+
+ComponentKind = Literal["tool", "resource", "prompt"]
+TagsLookup = Callable[[ComponentKind, str], Awaitable[set[str] | None]]
 
 
 class TagFilterMiddleware(Middleware):
     """Hide tools, resources, and prompts whose tags are not in ``allowed_tags``."""
 
-    def __init__(self, allowed_tags_provider: Callable[[], set[str]]) -> None:
+    def __init__(
+        self,
+        allowed_tags_provider: Callable[[], set[str]],
+        lookup_component_tags: TagsLookup,
+    ) -> None:
         """Initialise the middleware.
 
         :param allowed_tags_provider: zero-arg callable returning the *current*
             set of allowed tags. Wrapped in a callable so the operator can
             change permission flags without restarting the runtime.
+        :param lookup_component_tags: async ``(kind, key) -> set[str] | None``
+            that resolves a tool name / resource URI / prompt name back to its
+            tag set. Returns ``None`` when the component does not exist (treat
+            as blocked: a stale cached name from a prior permission set must
+            not slip through).
         """
         super().__init__()
         self._allowed = allowed_tags_provider
+        self._lookup = lookup_component_tags
 
     # ── filtered listings ────────────────────────────────────────────────────
 
@@ -86,10 +104,8 @@ class TagFilterMiddleware(Middleware):
         call_next: CallNext[Any, Any],
     ) -> Any:
         """Block calls to tools whose tag set has been disabled."""
-        tool = getattr(context, "fastmcp_context", None)
-        if tool is not None and not self._is_visible_by_name(getattr(context.message, "name", "")):
-            msg = "Tool is disabled by configuration"
-            raise PermissionError(msg)
+        name = getattr(context.message, "name", "")
+        await self._reject_if_hidden("tool", name)
         return await call_next(context)
 
     async def on_read_resource(
@@ -98,6 +114,8 @@ class TagFilterMiddleware(Middleware):
         call_next: CallNext[Any, Any],
     ) -> Any:
         """Block reads of resources whose tag set has been disabled."""
+        uri = str(getattr(context.message, "uri", ""))
+        await self._reject_if_hidden("resource", uri)
         return await call_next(context)
 
     async def on_get_prompt(
@@ -106,6 +124,8 @@ class TagFilterMiddleware(Middleware):
         call_next: CallNext[Any, Any],
     ) -> Any:
         """Block reads of prompts whose tag set has been disabled."""
+        name = getattr(context.message, "name", "")
+        await self._reject_if_hidden("prompt", name)
         return await call_next(context)
 
     # ── helpers ──────────────────────────────────────────────────────────────
@@ -117,8 +137,21 @@ class TagFilterMiddleware(Middleware):
         allowed = self._allowed()
         return any(str(t) in allowed for t in tags)
 
-    def _is_visible_by_name(self, _name: str) -> bool:
-        # Listings are already filtered, so callers shouldn't reach a hidden tool
-        # via a normal flow. We only reach this branch for clients that cached a
-        # name from an earlier permission set — keep it conservative and allow.
-        return True
+    async def _reject_if_hidden(self, kind: ComponentKind, key: str) -> None:
+        if not key:
+            return
+        tags = await self._lookup(kind, key)
+        if tags is None:
+            # Component doesn't exist (or is itself disabled at the FastMCP layer).
+            # Surface a NotFoundError so the SDK returns the spec-correct
+            # "method-not-allowed" / "not-found" path rather than 500.
+            msg = f"{kind.capitalize()} {key!r} not found"
+            raise NotFoundError(msg)
+        if not tags:
+            return  # untagged → always-on
+        allowed = self._allowed()
+        if not any(t in allowed for t in tags):
+            msg = (
+                f"{kind.capitalize()} {key!r} is currently disabled by configuration"
+            )
+            raise ToolError(msg)

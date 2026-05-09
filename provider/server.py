@@ -179,4 +179,27 @@ class MCPServerRuntime:
         # form lets us swap the allowed set later via apply_permission_change
         # without re-instantiating the middleware (single source of truth).
         self._allowed_tags: set[str] = {str(t) for t in allowed}
-        mcp.add_middleware(TagFilterMiddleware(lambda: self._allowed_tags))
+
+        async def lookup(kind: str, key: str) -> set[str] | None:
+            """Resolve component name/URI back to its tag set via FastMCP public API.
+
+            Returns ``None`` if the component is unknown — middleware then blocks
+            the call with NotFoundError, preventing a client that cached a name
+            from a prior permission set from invoking a now-hidden tool.
+            """
+            try:
+                if kind == "tool":
+                    obj = await mcp.get_tool(key)
+                elif kind == "resource":
+                    obj = await mcp.get_resource(key)
+                elif kind == "prompt":
+                    obj = await mcp.get_prompt(key)
+                else:  # pragma: no cover - kind is Literal-typed at the caller
+                    return None
+            except Exception:
+                return None
+            if obj is None:
+                return None
+            return {str(t) for t in (getattr(obj, "tags", None) or set())}
+
+        mcp.add_middleware(TagFilterMiddleware(lambda: self._allowed_tags, lookup))
