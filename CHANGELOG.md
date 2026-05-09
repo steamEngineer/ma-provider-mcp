@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] — 2026-05-10
+
+### Fixed
+- **Standalone-SSE keep-alive ping noisy traceback** when the client
+  closed the long-lived ``GET /mcp/v1`` stream (Claude Code does this
+  routinely after the initial handshake). ``sse_starlette`` would try
+  to send the next keep-alive, the bridge's ``send`` raised
+  ``ClientConnectionResetError`` from aiohttp, and the bridge logged
+  it as ERROR with a full traceback. Now the bridge:
+
+    * catches ``ConnectionResetError`` / ``ConnectionError`` /
+      ``CancelledError`` in both the send-direction and the
+      request-body pump,
+    * marks the response state as disconnected and feeds an ASGI
+      ``http.disconnect`` event upstream so the app's loops can wind
+      down,
+    * suppresses subsequent ``send()`` calls (no-op),
+    * logs at DEBUG instead of ERROR — this is a normal flow for
+      long-lived streams.
+
 ## [0.2.3] — 2026-05-10
 
 ### Fixed
