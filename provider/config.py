@@ -20,6 +20,7 @@ from .constants import (
     CONF_EDIT_LIBRARY,
     CONF_EDIT_PLAYLISTS,
     CONF_EDIT_QUEUE,
+    CONF_EXTRA_ALLOWED_ORIGINS,
     CONF_MOUNT_PATH,
     CONF_QUERY_LIBRARY,
     CONF_QUERY_METADATA,
@@ -96,6 +97,22 @@ def build_config_entries(
             description=(
                 "HTTP path prefix where the MCP server is mounted on MA's webserver. "
                 "Change only if it conflicts with another route."
+            ),
+            required=False,
+        ),
+        ConfigEntry(
+            key=CONF_EXTRA_ALLOWED_ORIGINS,
+            type=ConfigEntryType.STRING,
+            label="Additional allowed Origins (CSV)",
+            default_value="",
+            category="Server",
+            advanced=True,
+            description=(
+                "Comma-separated list of additional `Origin` headers to accept "
+                "(e.g. `https://ha.example.com` for Home Assistant ingress, or a "
+                "reverse-proxy hostname). By default the server only accepts "
+                "`localhost`, `127.0.0.1`, the MA `base_url` host, and `publish_ip`. "
+                "Mismatching Origins are rejected with 403 to mitigate DNS rebinding."
             ),
             required=False,
         ),

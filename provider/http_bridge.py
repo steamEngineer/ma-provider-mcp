@@ -17,6 +17,7 @@ import asyncio
 import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 from aiohttp import web
 
@@ -26,6 +27,99 @@ if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
 
 LOGGER = logging.getLogger(__name__)
+
+
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def _normalize_origin(origin: str) -> str | None:
+    """Return ``scheme://host[:port]`` lower-cased, default-port stripped, or None.
+
+    Rejects forms without scheme or netloc; preserves ``"null"`` verbatim so it
+    can be matched against an explicit allowlist entry.
+    """
+    if not origin:
+        return None
+    if origin == "null":
+        return "null"
+    parts = urlsplit(origin)
+    scheme = parts.scheme.lower()
+    host = parts.hostname
+    if not scheme or not host:
+        return None
+    port = parts.port
+    if port is None or port == _DEFAULT_PORTS.get(scheme):
+        return f"{scheme}://{host.lower()}"
+    return f"{scheme}://{host.lower()}:{port}"
+
+
+def _compute_origin_allowlist(
+    mass: MusicAssistant, extra_origins_csv: str = ""
+) -> frozenset[str]:
+    """Build the set of accepted ``Origin`` values for the MCP endpoint.
+
+    Always includes loopback variants (``http://localhost``, ``http://127.0.0.1``,
+    ``http://[::1]``), the host derived from ``mass.webserver.base_url``, and the
+    advertised ``mass.webserver.publish_ip``. Additional origins from config
+    (CSV) are normalized and added.
+    """
+    allow: set[str] = {
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://[::1]",
+    }
+
+    base_url = str(getattr(mass.webserver, "base_url", "") or "")
+    base_norm = _normalize_origin(base_url)
+    if base_norm:
+        allow.add(base_norm)
+        # Same host on https is acceptable when MA is behind TLS-terminating proxy.
+        if base_norm.startswith("http://"):
+            allow.add("https://" + base_norm[len("http://") :])
+
+    publish_ip = str(getattr(mass.webserver, "publish_ip", "") or "")
+    if publish_ip:
+        # Derive port from base_url; fallback: no port (browsers send port if non-default).
+        port = _port_from_base_url(base_url)
+        suffix = f":{port}" if port else ""
+        allow.add(f"http://{publish_ip.lower()}{suffix}")
+        allow.add(f"https://{publish_ip.lower()}{suffix}")
+
+    for raw in (extra_origins_csv or "").split(","):
+        norm = _normalize_origin(raw.strip())
+        if norm:
+            allow.add(norm)
+
+    return frozenset(allow)
+
+
+def _port_from_base_url(base_url: str) -> int | None:
+    """Helper: return explicit port from a URL, or None if it's the scheme default."""
+    if not base_url:
+        return None
+    parts = urlsplit(base_url)
+    if parts.port is not None and parts.port != _DEFAULT_PORTS.get(parts.scheme.lower()):
+        return parts.port
+    return None
+
+
+def _is_origin_allowed(origin: str | None, allowlist: frozenset[str]) -> bool:
+    """Return True if the request's ``Origin`` should be accepted.
+
+    Rules:
+
+    * Missing ``Origin`` → allowed (stdio-style or non-browser MCP clients).
+      Spec MUST applies to *present* Origin values.
+    * ``Origin: null`` → allowed only if explicitly listed in the allowlist
+      (some sandboxed iframes / file:// pages send it).
+    * Any other value is normalized and matched literally.
+    """
+    if origin is None:
+        return True
+    norm = _normalize_origin(origin)
+    if norm is None:
+        return False
+    return norm in allowlist
 
 
 async def mount_into_mass(
