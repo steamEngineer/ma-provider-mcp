@@ -2,16 +2,17 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security issue in this provider, please **do not** open a public
-issue. Instead, email the maintainer directly via the address listed on the
-[trudenboy GitHub profile](https://github.com/trudenboy).
+**Please do not report security vulnerabilities through public GitHub issues.**
 
-We aim to acknowledge reports within 72 hours and to release a fix within 30 days
-of confirmed reproduction.
+Use GitHub's built-in [Private Vulnerability Reporting](../../security/advisories/new) to report security issues confidentially.
 
-## Scope
+This ensures the issue can be assessed and a fix prepared before any public disclosure.
 
-This provider exposes Music Assistant control APIs over the Model Context Protocol
-(MCP). Authentication is delegated to MA's existing token system
-(`mass.webserver.auth.authenticate_with_token`), and all permissions are gated
-through provider configuration. The provider itself does not store credentials.
+### What to include
+
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Any suggested fix (optional)
+
+We aim to acknowledge reports within 72 hours and provide a fix timeline within 7 days.
