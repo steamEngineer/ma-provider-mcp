@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Sequence
 from typing import TYPE_CHECKING, Any, Literal
 
-from fastmcp.exceptions import NotFoundError, ToolError
+from fastmcp.exceptions import NotFoundError, PromptError, ResourceError, ToolError
 from fastmcp.server.middleware import Middleware
 
 if TYPE_CHECKING:
@@ -128,6 +128,14 @@ class TagFilterMiddleware(Middleware):
         await self._reject_if_hidden("prompt", name)
         return await call_next(context)
 
+    # Error class chosen so the SDK reports the failure under the right RPC
+    # method (tools/resources/prompts) rather than always as a tool error.
+    _ERROR_BY_KIND: dict[ComponentKind, type[Exception]] = {
+        "tool": ToolError,
+        "resource": ResourceError,
+        "prompt": PromptError,
+    }
+
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def _is_visible(self, component: Any) -> bool:
@@ -154,4 +162,4 @@ class TagFilterMiddleware(Middleware):
             msg = (
                 f"{kind.capitalize()} {key!r} is currently disabled by configuration"
             )
-            raise ToolError(msg)
+            raise self._ERROR_BY_KIND[kind](msg)

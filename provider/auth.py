@@ -89,7 +89,10 @@ class MASTokenVerifier(TokenVerifier):
             When ``False`` (default), only logs a warning so operators can
             migrate gracefully once MA-side issues audience-bound tokens.
         """
-        super().__init__(base_url=base_url) if base_url else super().__init__()
+        # ``base_url`` is optional on TokenVerifier — passing ``None`` is
+        # equivalent to not setting it. Forward verbatim so FastMCP can later
+        # build the resource_metadata URL from this verifier.
+        super().__init__(base_url=base_url)
         self._mass = mass
         self._public_resource_uri = public_resource_uri
         self._enforce_audience = enforce_audience

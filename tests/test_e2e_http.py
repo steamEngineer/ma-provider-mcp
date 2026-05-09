@@ -12,36 +12,10 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 from provider.http_bridge import mount_into_mass, mount_well_known
-
-
-class _Webserver:
-    """Captures every dynamic-route registration so we can wire them into aiohttp."""
-
-    def __init__(self) -> None:
-        self.routes: list[tuple[str, Any, str]] = []
-        self.base_url = "http://localhost:8095"
-        self.publish_ip = "127.0.0.1"
-
-    def register_dynamic_route(self, path: str, handler: Any, method: str = "*") -> Any:
-        self.routes.append((path, handler, method))
-        return lambda path=path: None  # noqa: ARG005
-
-
-def _build_app(routes: list[tuple[str, Any, str]]) -> web.Application:
-    """Translate captured (path, handler, method) tuples into aiohttp routes."""
-    app = web.Application()
-    for path, handler, method in routes:
-        if path.endswith("/*"):
-            stem = path[:-2]
-            app.router.add_route(method, f"{stem}/{{tail:.*}}", handler)
-        else:
-            normalized = method if method != "*" else "GET"
-            app.router.add_route(normalized, path, handler)
-    return app
+from tests.conftest import FakeWebserver, build_aiohttp_app
 
 
 async def _streaming_asgi(scope: dict, receive: Any, send: Any) -> None:  # noqa: ARG001
@@ -87,20 +61,20 @@ class _Mcp:
 @pytest.fixture
 async def streaming_client() -> Any:
     """Bridge an SSE-streaming ASGI app through mount_into_mass."""
-    ws = _Webserver()
+    ws = FakeWebserver()
     mass = SimpleNamespace(webserver=ws)
     await mount_into_mass(mass, _Mcp(_streaming_asgi), mount_path="/mcp/v1")
-    async with TestClient(TestServer(_build_app(ws.routes))) as client:
+    async with TestClient(TestServer(build_aiohttp_app(ws))) as client:
         yield client
 
 
 @pytest.fixture
 async def method_echo_client() -> Any:
     """Bridge a method-echo ASGI app to verify DELETE / arbitrary verbs work."""
-    ws = _Webserver()
+    ws = FakeWebserver()
     mass = SimpleNamespace(webserver=ws)
     await mount_into_mass(mass, _Mcp(_method_echo_asgi), mount_path="/mcp/v1")
-    async with TestClient(TestServer(_build_app(ws.routes))) as client:
+    async with TestClient(TestServer(build_aiohttp_app(ws))) as client:
         yield client
 
 
@@ -134,7 +108,7 @@ async def test_get_method_reaches_asgi(method_echo_client: TestClient) -> None:
 
 async def test_well_known_alongside_mcp_mount() -> None:
     """Both /mcp/v1/* and /.well-known/oauth-protected-resource are reachable."""
-    ws = _Webserver()
+    ws = FakeWebserver()
     mass = SimpleNamespace(webserver=ws)
     await mount_into_mass(mass, _Mcp(_method_echo_asgi), mount_path="/mcp/v1")
     await mount_well_known(
@@ -145,7 +119,7 @@ async def test_well_known_alongside_mcp_mount() -> None:
         scopes_supported=["query:library"],
         resource_name="Music Assistant MCP",
     )
-    async with TestClient(TestServer(_build_app(ws.routes))) as client:
+    async with TestClient(TestServer(build_aiohttp_app(ws))) as client:
         # MCP endpoint reachable
         resp = await client.post(
             "/mcp/v1/", headers={"Origin": "http://localhost:8095"}

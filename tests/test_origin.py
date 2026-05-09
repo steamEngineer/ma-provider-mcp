@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 from provider.http_bridge import (
@@ -17,6 +16,7 @@ from provider.http_bridge import (
     mount_into_mass,
     mount_well_known,
 )
+from tests.conftest import FakeWebserver, build_aiohttp_app
 
 
 @pytest.mark.parametrize(
@@ -140,32 +140,15 @@ async def _echo_asgi(scope: dict, receive: Any, send: Any) -> None:  # noqa: ARG
     await send({"type": "http.response.body", "body": b"OK"})
 
 
-class _FakeWebserver:
-    """Captures the dynamic-route handler so a TestClient can hit it directly."""
-
-    def __init__(self) -> None:
-        self.handler: Any = None
-        self.path: str | None = None
-        self.base_url = "http://localhost:8095"
-        self.publish_ip = "127.0.0.1"
-
-    def register_dynamic_route(self, path: str, handler: Any, method: str = "*") -> Any:
-        self.path = path
-        self.handler = handler
-        return lambda: None
-
-
 @pytest.fixture
-async def bridge_client(extra_origins: str = "") -> Any:  # noqa: ARG001
-    """Fixture: build the bridge handler against a fake MA + fake ASGI, expose via TestClient."""
-    fake_ws = _FakeWebserver()
+async def bridge_client() -> Any:
+    """Build the bridge handler against a fake MA + fake ASGI, expose via TestClient."""
+    fake_ws = FakeWebserver()
     mass = SimpleNamespace(webserver=fake_ws)
     mcp = _FakeMcp(_echo_asgi)
     await mount_into_mass(mass, mcp, mount_path="/mcp/v1", extra_origins_csv="")
 
-    app = web.Application()
-    app.router.add_route("*", "/mcp/v1/{tail:.*}", fake_ws.handler)
-    async with TestClient(TestServer(app)) as client:
+    async with TestClient(TestServer(build_aiohttp_app(fake_ws))) as client:
         yield client
 
 
@@ -217,24 +200,36 @@ def test_build_protected_resource_metadata_full() -> None:
     assert meta["resource_name"] == "Music Assistant MCP"
 
 
-class _CapturingWebserver:
-    """Captures every dynamic-route registration so a test can mount its handlers."""
+async def test_mount_well_known_with_dynamic_scopes_refreshes() -> None:
+    """When scopes_supported is a callable, the body refreshes on each request.
 
-    def __init__(self) -> None:
-        self.routes: list[tuple[str, Any, str]] = []
-        self.base_url = "http://localhost:8095"
-        self.publish_ip = "127.0.0.1"
+    Permission hot-swap mutates the closed-over set in MCPServerRuntime;
+    the well-known endpoint must reflect the change without a runtime rebuild.
+    """
+    fake_ws = FakeWebserver()
+    mass = SimpleNamespace(webserver=fake_ws)
+    scopes: list[str] = ["query:library"]
+    await mount_well_known(
+        mass,
+        mount_path="/mcp/v1",
+        resource_uri="http://localhost:8095/mcp/v1",
+        authorization_servers=["http://localhost:8095"],
+        scopes_supported=lambda: list(scopes),
+        resource_name="MA MCP",
+    )
 
-    def register_dynamic_route(self, path: str, handler: Any, method: str = "*") -> Any:
-        self.routes.append((path, handler, method))
-        return lambda path=path: self.routes.remove(
-            next((r for r in self.routes if r[0] == path), (path, None, method))
-        )
+    async with TestClient(TestServer(build_aiohttp_app(fake_ws))) as client:
+        before = await (await client.get("/.well-known/oauth-protected-resource")).json()
+        assert before["scopes_supported"] == ["query:library"]
+        # Mutate the underlying set (simulates hot-swap of permission flags).
+        scopes.append("control:playback")
+        after = await (await client.get("/.well-known/oauth-protected-resource")).json()
+        assert "control:playback" in after["scopes_supported"]
 
 
 async def test_mount_well_known_serves_metadata() -> None:
     """The well-known route returns the RFC 9728 JSON document for both URI forms."""
-    fake_ws = _CapturingWebserver()
+    fake_ws = FakeWebserver()
     mass = SimpleNamespace(webserver=fake_ws)
     unmount = await mount_well_known(
         mass,
@@ -249,10 +244,7 @@ async def test_mount_well_known_serves_metadata() -> None:
     assert "/.well-known/oauth-protected-resource/mcp/v1" in paths
     assert "/.well-known/oauth-protected-resource" in paths
 
-    app = web.Application()
-    for path, handler, _method in fake_ws.routes:
-        app.router.add_get(path, handler)
-    async with TestClient(TestServer(app)) as client:
+    async with TestClient(TestServer(build_aiohttp_app(fake_ws))) as client:
         for path in paths:
             resp = await client.get(path)
             assert resp.status == 200
@@ -269,16 +261,14 @@ async def test_mount_well_known_serves_metadata() -> None:
 
 async def test_bridge_with_extra_origins() -> None:
     """``extra_origins_csv`` widens the allowlist for reverse-proxy / HA ingress."""
-    fake_ws = _FakeWebserver()
+    fake_ws = FakeWebserver()
     mass = SimpleNamespace(webserver=fake_ws)
     mcp = _FakeMcp(_echo_asgi)
     await mount_into_mass(
         mass, mcp, mount_path="/mcp/v1", extra_origins_csv="https://ha.example.com"
     )
 
-    app = web.Application()
-    app.router.add_route("*", "/mcp/v1/{tail:.*}", fake_ws.handler)
-    async with TestClient(TestServer(app)) as client:
+    async with TestClient(TestServer(build_aiohttp_app(fake_ws))) as client:
         resp = await client.post(
             "/mcp/v1/", headers={"Origin": "https://ha.example.com"}
         )

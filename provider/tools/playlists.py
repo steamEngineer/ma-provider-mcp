@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 from fastmcp import Context, FastMCP
@@ -75,15 +76,36 @@ def build_playlists_server(
         For batches up to 10 the call is bulk-dispatched (one round-trip);
         beyond that, items are added one-by-one with progress reporting so
         the LLM client can show a meaningful spinner / cancellation handle.
+
+        .. warning::
+
+            The per-item path is **not transactional**. If the client cancels
+            (``notifications/cancelled``) or MA raises on the N-th track,
+            tracks 0..N-1 stay added — there is no rollback. Callers that need
+            atomic semantics should keep batches at ``<= 10`` so the bulk
+            ``add_playlist_tracks`` round-trip is used.
         """
         total = len(track_uris)
         if total <= 10:
             await mass.music.playlists.add_playlist_tracks(playlist_id, track_uris)
             return
-        for i, uri in enumerate(track_uris, start=1):
-            await mass.music.playlists.add_playlist_track(playlist_id, uri)
-            if ctx is not None:
-                await ctx.report_progress(progress=i, total=total)
+        added = 0
+        try:
+            for i, uri in enumerate(track_uris, start=1):
+                await mass.music.playlists.add_playlist_track(playlist_id, uri)
+                added = i
+                if ctx is not None:
+                    await ctx.report_progress(progress=i, total=total)
+        except BaseException:
+            # Surface partial-state to the client before re-raising. BaseException
+            # also catches asyncio.CancelledError, which we want to flag.
+            if ctx is not None and added < total:
+                with contextlib.suppress(Exception):
+                    await ctx.warning(
+                        f"add_tracks: partial state — {added} of {total} tracks "
+                        f"added to playlist {playlist_id!r} before failure / cancel"
+                    )
+            raise
 
     @sub.tool(
         tags={Tag.DELETE_PLAYLISTS},

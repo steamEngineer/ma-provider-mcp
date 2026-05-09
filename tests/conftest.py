@@ -26,6 +26,65 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 
+class FakeWebserver:
+    """Captures every dynamic-route registration so tests can drive them through aiohttp.
+
+    Mirrors the surface of ``mass.webserver`` that this plugin uses, without
+    depending on a real Music Assistant install. Exposed via the
+    :func:`fake_webserver` fixture and :func:`build_aiohttp_app` helper.
+    """
+
+    def __init__(
+        self,
+        *,
+        base_url: str = "http://localhost:8095",
+        publish_ip: str = "127.0.0.1",
+    ) -> None:
+        self.routes: list[tuple[str, Any, str]] = []
+        self.base_url = base_url
+        self.publish_ip = publish_ip
+
+    def register_dynamic_route(
+        self, path: str, handler: Any, method: str = "*"
+    ) -> Any:
+        """Mirror ``mass.webserver.register_dynamic_route``: store + return unregister."""
+        self.routes.append((path, handler, method))
+
+        def _unregister() -> None:
+            try:
+                self.routes.remove((path, handler, method))
+            except ValueError:
+                pass
+
+        return _unregister
+
+    @property
+    def handler(self) -> Any:
+        """Return the single registered handler (convenience for one-route tests)."""
+        return self.routes[0][1] if self.routes else None
+
+
+def build_aiohttp_app(fake_ws: FakeWebserver) -> Any:
+    """Translate captured ``(path, handler, method)`` tuples into an aiohttp app."""
+    from aiohttp import web  # noqa: PLC0415 - aiohttp only needed by HTTP-level tests
+
+    app = web.Application()
+    for path, handler, method in fake_ws.routes:
+        if path.endswith("/*"):
+            stem = path[:-2]
+            app.router.add_route(method, f"{stem}/{{tail:.*}}", handler)
+        else:
+            normalized = method if method != "*" else "GET"
+            app.router.add_route(normalized, path, handler)
+    return app
+
+
+@pytest.fixture
+def fake_webserver() -> FakeWebserver:
+    """Fresh ``FakeWebserver`` instance per test."""
+    return FakeWebserver()
+
+
 @pytest.fixture
 def mock_user() -> MagicMock:
     """A minimal stand-in for an MA ``User`` object."""

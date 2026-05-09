@@ -196,7 +196,7 @@ async def mount_well_known(
     mount_path: str,
     resource_uri: str,
     authorization_servers: list[str],
-    scopes_supported: list[str] | None = None,
+    scopes_supported: list[str] | Callable[[], list[str]] | None = None,
     resource_name: str | None = None,
 ) -> Callable[[], None]:
     """Register the Protected Resource Metadata endpoint on MA's webserver.
@@ -209,17 +209,31 @@ async def mount_well_known(
       §3.1 second form), so clients that strip the path component still find
       the document.
 
+    :param scopes_supported: Either a static list (snapshot at mount time) or a
+        zero-arg callable returning the current scope list. The callable form
+        lets the document stay in sync with permission hot-swaps without a
+        runtime rebuild — the body is regenerated on each request.
     :return: Callable that unregisters both routes when invoked.
     """
-    metadata = build_protected_resource_metadata(
-        resource_uri=resource_uri,
-        authorization_servers=authorization_servers,
-        scopes_supported=scopes_supported,
-        resource_name=resource_name,
-    )
-    body = json.dumps(metadata).encode()
+    is_dynamic = callable(scopes_supported)
+
+    def _build_body() -> bytes:
+        scopes = scopes_supported() if is_dynamic else scopes_supported  # type: ignore[operator]
+        metadata = build_protected_resource_metadata(
+            resource_uri=resource_uri,
+            authorization_servers=authorization_servers,
+            scopes_supported=scopes,
+            resource_name=resource_name,
+        )
+        return json.dumps(metadata).encode()
+
+    # Static scopes: pre-compute once (faster). Dynamic scopes: regenerate per
+    # request so hot-swapped permissions show up immediately.
+    cached_body: bytes | None = None if is_dynamic else _build_body()
 
     async def handler(_request: web.Request) -> web.Response:
+        body = _build_body() if is_dynamic else cached_body
+        assert body is not None
         return web.Response(
             body=body,
             content_type="application/json",

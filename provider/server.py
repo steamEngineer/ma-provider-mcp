@@ -156,7 +156,10 @@ class MCPServerRuntime:
                 mount_path=self._mount_path,
                 resource_uri=public_resource_uri,
                 authorization_servers=[base_url],
-                scopes_supported=[str(t) for t in enabled_tags(self._config)],
+                # Lazy provider so hot-swapped permissions update the
+                # advertised `scopes_supported` immediately, without
+                # rebuilding the runtime.
+                scopes_supported=lambda: [str(t) for t in enabled_tags(self._config)],
                 resource_name="Music Assistant MCP",
             )
 
