@@ -8,6 +8,7 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from ..tags import Tag
+from ._common import TIMEOUT_FAST
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
@@ -31,6 +32,7 @@ def build_volume_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_VOLUME},
         annotations=_vol_annotations(title="Set volume", idempotent=True),
+        timeout=TIMEOUT_FAST,
     )
     async def volume_set(player_id: str, level: int) -> None:
         """Set absolute volume level (0-100) on a player."""
@@ -39,6 +41,7 @@ def build_volume_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_VOLUME},
         annotations=_vol_annotations(title="Volume up", idempotent=False),
+        timeout=TIMEOUT_FAST,
     )
     async def volume_up(player_id: str) -> None:
         """Bump volume up one step."""
@@ -47,6 +50,7 @@ def build_volume_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_VOLUME},
         annotations=_vol_annotations(title="Volume down", idempotent=False),
+        timeout=TIMEOUT_FAST,
     )
     async def volume_down(player_id: str) -> None:
         """Bump volume down one step."""
@@ -55,6 +59,7 @@ def build_volume_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_VOLUME},
         annotations=_vol_annotations(title="Mute / unmute", idempotent=True),
+        timeout=TIMEOUT_FAST,
     )
     async def volume_mute(player_id: str, muted: bool) -> None:
         """Mute or unmute a player."""
@@ -63,6 +68,7 @@ def build_volume_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_VOLUME},
         annotations=_vol_annotations(title="Set group volume", idempotent=True),
+        timeout=TIMEOUT_FAST,
     )
     async def group_volume_set(player_id: str, level: int) -> None:
         """Set group volume level (0-100) on a sync group."""

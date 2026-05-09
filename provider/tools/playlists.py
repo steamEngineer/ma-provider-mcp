@@ -9,7 +9,7 @@ from mcp.types import ToolAnnotations
 
 from ..models import PlaylistBrief
 from ..tags import Tag
-from ._common import confirm_or_raise, to_brief_playlist
+from ._common import TIMEOUT_BULK, TIMEOUT_MUTATION, confirm_or_raise, to_brief_playlist
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
@@ -30,6 +30,7 @@ def build_playlists_server(
             idempotentHint=False,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def create_playlist(name: str, provider_instance_id: str | None = None) -> PlaylistBrief:
         """Create a new playlist on a music provider."""
@@ -47,6 +48,7 @@ def build_playlists_server(
             idempotentHint=False,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def add_track(playlist_id: str | int, track_uri: str) -> None:
         """Append one track to a playlist."""
@@ -61,6 +63,7 @@ def build_playlists_server(
             idempotentHint=False,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_BULK,
     )
     async def add_tracks(
         playlist_id: str | int,
@@ -91,6 +94,7 @@ def build_playlists_server(
             idempotentHint=False,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def remove_tracks(
         playlist_id: str | int,

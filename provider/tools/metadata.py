@@ -9,7 +9,7 @@ from mcp.types import ToolAnnotations
 
 from ..models import TrackBrief
 from ..tags import Tag
-from ._common import to_brief_track
+from ._common import TIMEOUT_QUERY, to_brief_track
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
@@ -39,6 +39,7 @@ def build_metadata_server(mass: MusicAssistant) -> FastMCP:
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_QUERY,
     )
     async def recommendations(ctx: Context | None = None) -> list[dict[str, Any]]:
         """Return Music Assistant's curated recommendations folders."""
@@ -65,13 +66,18 @@ def build_metadata_server(mass: MusicAssistant) -> FastMCP:
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_QUERY,
     )
     async def recently_played(limit: int = 10) -> list[TrackBrief]:
         """Return the user's recently played tracks."""
         items = await mass.music.recently_played(limit=limit)
         return [to_brief_track(it) for it in items if getattr(it, "name", None)]
 
-    @sub.tool(tags={Tag.QUERY_METADATA}, annotations=_readonly("Get lyrics"))
+    @sub.tool(
+        tags={Tag.QUERY_METADATA},
+        annotations=_readonly("Get lyrics"),
+        timeout=TIMEOUT_QUERY,
+    )
     async def get_lyrics(track_uri: str) -> str | None:
         """Return lyrics for a track URI (best-effort).
 

@@ -9,7 +9,7 @@ from mcp.types import ToolAnnotations
 
 from ..models import QueueBrief
 from ..tags import Tag
-from ._common import confirm_or_raise, to_brief_queue
+from ._common import TIMEOUT_FAST, TIMEOUT_MUTATION, confirm_or_raise, to_brief_queue
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
@@ -30,6 +30,7 @@ def build_queue_server(
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_FAST,
     )
     async def get_active_queue(player_id: str, include_items: int = 25) -> QueueBrief:
         """Return the active queue for a player, including up to ``include_items`` lookahead."""
@@ -51,6 +52,7 @@ def build_queue_server(
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def set_shuffle(queue_id: str, enabled: bool) -> None:
         """Enable or disable shuffle on the given queue."""
@@ -65,6 +67,7 @@ def build_queue_server(
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def clear_queue(queue_id: str, ctx: Context | None = None) -> None:
         """Clear all items from the given queue.
@@ -92,6 +95,7 @@ def build_queue_server(
             idempotentHint=False,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def transfer_queue(source_queue_id: str, target_queue_id: str) -> None:
         """Move a queue from one player to another."""

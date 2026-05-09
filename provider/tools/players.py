@@ -9,7 +9,7 @@ from mcp.types import ToolAnnotations
 
 from ..models import PlayerBrief
 from ..tags import Tag
-from ._common import to_brief_player
+from ._common import TIMEOUT_FAST, TIMEOUT_MUTATION, to_brief_player
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
@@ -36,6 +36,7 @@ def build_players_server(mass: MusicAssistant) -> FastMCP:
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_FAST,
     )
     async def list_players() -> list[PlayerBrief]:
         """List all players known to MA."""
@@ -53,6 +54,7 @@ def build_players_server(mass: MusicAssistant) -> FastMCP:
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_FAST,
     )
     async def get_player(player_id: str) -> PlayerBrief | None:
         """Return a single player by id, or ``None`` if it doesn't exist."""
@@ -68,6 +70,7 @@ def build_players_server(mass: MusicAssistant) -> FastMCP:
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def set_power(player_id: str, powered: bool) -> None:
         """Power a player on or off."""
@@ -82,6 +85,7 @@ def build_players_server(mass: MusicAssistant) -> FastMCP:
             idempotentHint=False,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def group_player(player_id: str, target_player_id: str) -> None:
         """Group ``player_id`` with ``target_player_id`` (sync group)."""

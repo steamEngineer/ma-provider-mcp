@@ -8,7 +8,7 @@ from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from ..tags import Tag
-from ._common import confirm_or_raise
+from ._common import TIMEOUT_MUTATION, confirm_or_raise
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
@@ -29,6 +29,7 @@ def build_media_server(
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def add_to_favorites(uri: str) -> None:
         """Add a media item (by URI) to favorites."""
@@ -43,6 +44,7 @@ def build_media_server(
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def remove_from_favorites(uri: str, ctx: Context | None = None) -> None:
         """Remove a media item (by URI) from favorites."""
@@ -62,6 +64,7 @@ def build_media_server(
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def add_to_library(uri: str) -> None:
         """Add a media item (by URI) to the library."""
@@ -76,6 +79,7 @@ def build_media_server(
             idempotentHint=True,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def remove_from_library(uri: str, ctx: Context | None = None) -> None:
         """Remove a media item (by URI) from the library."""
@@ -95,6 +99,7 @@ def build_media_server(
             idempotentHint=False,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def mark_played(uri: str) -> None:
         """Mark a media item as played (updates play history)."""
@@ -109,6 +114,7 @@ def build_media_server(
             idempotentHint=False,
             openWorldHint=False,
         ),
+        timeout=TIMEOUT_MUTATION,
     )
     async def play_announcement(player_id: str, url: str, volume_level: int | None = None) -> None:
         """Play a one-shot announcement audio URL on a player."""

@@ -8,6 +8,7 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from ..tags import Tag
+from ._common import TIMEOUT_MUTATION
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
@@ -31,6 +32,7 @@ def build_playback_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_PLAYBACK},
         annotations=_control_annotations(title="Toggle play / pause"),
+        timeout=TIMEOUT_MUTATION,
     )
     async def play_pause(queue_id: str) -> None:
         """Toggle play/pause on the given queue."""
@@ -39,6 +41,7 @@ def build_playback_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_PLAYBACK},
         annotations=_control_annotations(title="Stop playback", idempotent=True),
+        timeout=TIMEOUT_MUTATION,
     )
     async def stop(queue_id: str) -> None:
         """Stop playback on the given queue."""
@@ -47,6 +50,7 @@ def build_playback_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_PLAYBACK},
         annotations=_control_annotations(title="Next track"),
+        timeout=TIMEOUT_MUTATION,
     )
     async def next_track(queue_id: str) -> None:
         """Advance to the next track."""
@@ -55,6 +59,7 @@ def build_playback_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_PLAYBACK},
         annotations=_control_annotations(title="Previous track"),
+        timeout=TIMEOUT_MUTATION,
     )
     async def previous_track(queue_id: str) -> None:
         """Return to the previous track."""
@@ -63,6 +68,7 @@ def build_playback_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_PLAYBACK},
         annotations=_control_annotations(title="Skip by seconds"),
+        timeout=TIMEOUT_MUTATION,
     )
     async def skip(queue_id: str, seconds: int = 10) -> None:
         """Skip forward by ``seconds`` (or backward when negative)."""
@@ -71,6 +77,7 @@ def build_playback_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_PLAYBACK},
         annotations=_control_annotations(title="Seek to position"),
+        timeout=TIMEOUT_MUTATION,
     )
     async def seek(queue_id: str, position: int) -> None:
         """Seek to absolute position (seconds) in the current track."""
@@ -79,6 +86,7 @@ def build_playback_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_PLAYBACK},
         annotations=_control_annotations(title="Play media on a queue"),
+        timeout=TIMEOUT_MUTATION,
     )
     async def play_media(
         queue_id: str,
@@ -96,6 +104,7 @@ def build_playback_server(mass: MusicAssistant) -> FastMCP:
     @sub.tool(
         tags={Tag.CONTROL_PLAYBACK},
         annotations=_control_annotations(title="Play queue item at index"),
+        timeout=TIMEOUT_MUTATION,
     )
     async def play_index(queue_id: str, index: int) -> None:
         """Play the queue item at the given zero-based index."""

@@ -25,6 +25,14 @@ if TYPE_CHECKING:
 MAX_PAGE = 200
 DEFAULT_PAGE = 50
 
+# Per-tool execution timeouts (seconds), used in @sub.tool(timeout=…). Long
+# searches and recommendation fetches reach external music providers; transport
+# controls are local-RPC-fast; bulk playlist edits are explicitly larger.
+TIMEOUT_FAST = 10.0
+TIMEOUT_MUTATION = 15.0
+TIMEOUT_QUERY = 30.0
+TIMEOUT_BULK = 60.0
+
 
 async def confirm_or_raise(
     ctx: Context | None, prompt: str, *, enabled: bool
