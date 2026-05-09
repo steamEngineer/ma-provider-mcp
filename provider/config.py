@@ -20,12 +20,15 @@ from .constants import (
     CONF_EDIT_LIBRARY,
     CONF_EDIT_PLAYLISTS,
     CONF_EDIT_QUEUE,
+    CONF_ENFORCE_AUDIENCE,
+    CONF_EXTRA_ALLOWED_ORIGINS,
     CONF_MOUNT_PATH,
     CONF_QUERY_LIBRARY,
     CONF_QUERY_METADATA,
     CONF_QUERY_PLAYERS,
     CONF_QUERY_QUEUE,
     CONF_REQUIRE_AUTH,
+    CONF_REQUIRE_CONFIRMATION,
     CONF_RES_LIBRARY,
     CONF_RES_PLAYER,
     CONF_RES_PROMPTS,
@@ -96,6 +99,54 @@ def build_config_entries(
             description=(
                 "HTTP path prefix where the MCP server is mounted on MA's webserver. "
                 "Change only if it conflicts with another route."
+            ),
+            required=False,
+        ),
+        ConfigEntry(
+            key=CONF_REQUIRE_CONFIRMATION,
+            type=ConfigEntryType.BOOLEAN,
+            label="Confirm destructive operations",
+            default_value=True,
+            category="Server",
+            description=(
+                "Ask the MCP client to confirm before running destructive tools "
+                "(clear_queue, remove_tracks, remove_from_library, "
+                "remove_from_favorites). If the client doesn't support "
+                "elicitation, the call falls through to the permission flag."
+            ),
+            required=False,
+        ),
+        ConfigEntry(
+            key=CONF_ENFORCE_AUDIENCE,
+            type=ConfigEntryType.BOOLEAN,
+            label="Enforce token audience (RFC 8707)",
+            default_value=False,
+            category="Server",
+            advanced=True,
+            description=(
+                "Reject Bearer tokens whose `aud` claim does not match this MCP "
+                "server's canonical URI. Mitigates the OAuth confused-deputy "
+                "attack where a token issued for one MA endpoint is replayed "
+                "against another. Requires upstream Music Assistant support for "
+                "writing `aud` into JWTs (in progress) — until then enabling "
+                "this rejects all existing tokens. Leave off unless your MA "
+                "build issues audience-bound tokens."
+            ),
+            required=False,
+        ),
+        ConfigEntry(
+            key=CONF_EXTRA_ALLOWED_ORIGINS,
+            type=ConfigEntryType.STRING,
+            label="Additional allowed Origins (CSV)",
+            default_value="",
+            category="Server",
+            advanced=True,
+            description=(
+                "Comma-separated list of additional `Origin` headers to accept "
+                "(e.g. `https://ha.example.com` for Home Assistant ingress, or a "
+                "reverse-proxy hostname). By default the server only accepts "
+                "`localhost`, `127.0.0.1`, the MA `base_url` host, and `publish_ip`. "
+                "Mismatching Origins are rejected with 403 to mitigate DNS rebinding."
             ),
             required=False,
         ),

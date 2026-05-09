@@ -1,8 +1,11 @@
 """Shared helpers for tool sub-servers."""
+# ruff: noqa: TID252  -- relative imports are the canonical MA-provider pattern.
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+
+from fastmcp.exceptions import ToolError
 
 from ..models import (
     AlbumBrief,
@@ -18,8 +21,46 @@ from ..models import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from fastmcp import Context
+
 MAX_PAGE = 200
 DEFAULT_PAGE = 50
+
+# Per-tool execution timeouts (seconds), used in @sub.tool(timeout=…). Long
+# searches and recommendation fetches reach external music providers; transport
+# controls are local-RPC-fast; bulk playlist edits are explicitly larger.
+TIMEOUT_FAST = 10.0
+TIMEOUT_MUTATION = 15.0
+TIMEOUT_QUERY = 30.0
+TIMEOUT_BULK = 60.0
+
+
+async def confirm_or_raise(
+    ctx: Context | None, prompt: str, *, enabled: bool
+) -> None:
+    """Ask the MCP client to confirm a destructive operation.
+
+    If ``enabled`` is False, or there is no Context (direct unit-test
+    invocation), or the client returns ``NotImplementedError`` (no elicit
+    support), the call passes through silently — the permission flag is
+    still in effect as the primary defense.
+
+    On user decline / cancel, raises ``ToolError`` so the SDK reports it as
+    a tool-execution error (``isError: true``) rather than a protocol error.
+    """
+    if not enabled or ctx is None:
+        return
+    try:
+        # ctx.elicit's overloads in older mypy stubs don't recognize ``bool``
+        # as a valid scalar response_type — runtime behaviour is fine.
+        result = await ctx.elicit(prompt, response_type=bool)  # type: ignore[arg-type]
+    except NotImplementedError:
+        return
+    action = getattr(result, "action", None)
+    data = getattr(result, "data", None)
+    if action != "accept" or not data:
+        msg = "Operation cancelled by user"
+        raise ToolError(msg)
 
 
 def page_args(offset: int = 0, limit: int = DEFAULT_PAGE) -> tuple[int, int]:
@@ -116,12 +157,21 @@ def to_brief_queue(queue: Any, items: Sequence[Any] | None = None) -> QueueBrief
                     artists=_names(getattr(getattr(it, "media_item", None), "artists", None)),
                 )
             )
+    # In the canonical MA model PlayerQueue.items is an int (total queue
+    # length), not a list. Fall back to alternate field names for older builds,
+    # and only as a last resort to len(brief_items) — which would under-report
+    # the real length, since `brief_items` is the truncated lookahead from
+    # get_active_queue, not the full queue.
+    raw_total = getattr(queue, "items", None)
+    explicit_count = _int(raw_total) if isinstance(raw_total, int) else None
+    if explicit_count is None:
+        explicit_count = _int(
+            getattr(queue, "items_count", None) or getattr(queue, "items_total", None)
+        )
     return QueueBrief(
         queue_id=str(getattr(queue, "queue_id", "")),
         current_index=_int(getattr(queue, "current_index", None)),
-        item_count=int(getattr(queue, "items", 0) or 0)
-        if isinstance(getattr(queue, "items", 0), int)
-        else len(brief_items),
+        item_count=explicit_count if explicit_count is not None else len(brief_items),
         shuffle=bool(getattr(queue, "shuffle_enabled", False)),
         repeat=repeat_value,
         items=brief_items,

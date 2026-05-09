@@ -47,10 +47,25 @@ The provider config exposes 16 permission booleans, grouped by category:
 | Edit       | library (add), queue (move/save), playlists (create/add/reorder), favorites (add) |
 | Delete     | library (remove), queue (clear), playlists (delete), favorites (remove) |
 
-Each maps to a tag (`query:library`, `control:playback`, …). FastMCP's
-`restrict_tag` middleware filters `tools/list`, `resources/list`, and
-`prompts/list` so disabled tools are **invisible** to clients (no permission-denied
-trace leaks).
+Each maps to a tag (`query:library`, `control:playback`, …). A custom
+`TagFilterMiddleware` filters `tools/list` / `resources/list` / `prompts/list`
+**and** blocks direct invocation of disabled components — so a client that
+cached a tool name from an earlier permission set cannot bypass the filter.
+
+## Spec compliance (MCP 2025-06-18 / draft)
+
+- **Streamable HTTP transport** with mandatory `Origin` validation
+  (DNS-rebinding mitigation). Allowlist auto-built from `mass.webserver`;
+  add reverse-proxy hosts via `extra_allowed_origins` (CSV).
+- **OAuth 2.0 Protected Resource Metadata** (RFC 9728) at
+  `/.well-known/oauth-protected-resource[/mcp/v1]`, plus `resource_metadata`
+  in `WWW-Authenticate` 401 responses.
+- **Resource Indicator support** (RFC 8707): `AccessToken.resource` is set,
+  optional `enforce_audience` config rejects tokens whose `aud` ≠ canonical
+  URI (soft mode by default — logs warning until MA issues audience-bound JWTs).
+- **Tool annotations** (`title`, `readOnly`/`destructive`/`idempotent`/`openWorld` hints).
+- **Elicitation** for destructive operations.
+- **Per-tool timeouts** so a stuck provider doesn't tie up an MCP session.
 
 ## Development
 

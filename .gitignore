@@ -21,6 +21,10 @@ build/
 *.swp
 *.swo
 
+# Claude Code local overrides
+CLAUDE.local.md
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

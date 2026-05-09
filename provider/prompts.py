@@ -15,15 +15,13 @@ from .constants import CONF_RES_PROMPTS
 if TYPE_CHECKING:
     from music_assistant_models.config_entries import ProviderConfig
 
-    from music_assistant.mass import MusicAssistant
 
-
-def register_prompts(mcp: Any, mass: MusicAssistant, config: ProviderConfig) -> None:  # noqa: ARG001
+def register_prompts(mcp: Any, config: ProviderConfig) -> None:
     """Register canned prompts on the FastMCP root, gated by ``CONF_RES_PROMPTS``."""
     if not config.get_value(CONF_RES_PROMPTS):
         return
 
-    @mcp.prompt(name="find_and_play")
+    @mcp.prompt(name="find_and_play")  # type: ignore[untyped-decorator]
     def find_and_play(query: str = "", target_player: str = "") -> str:
         """Search and play media on a player."""
         target = target_player or "<the user's preferred player>"
@@ -38,7 +36,7 @@ def register_prompts(mcp: Any, mass: MusicAssistant, config: ProviderConfig) -> 
             "and report it back."
         )
 
-    @mcp.prompt(name="curate_party_playlist")
+    @mcp.prompt(name="curate_party_playlist")  # type: ignore[untyped-decorator]
     def party_playlist(theme: str = "indie 2010s", length_minutes: int = 60) -> str:
         """Build a party playlist."""
         return (
@@ -53,7 +51,7 @@ def register_prompts(mcp: Any, mass: MusicAssistant, config: ProviderConfig) -> 
             "Report the playlist URI when done."
         )
 
-    @mcp.prompt(name="now_playing_summary")
+    @mcp.prompt(name="now_playing_summary")  # type: ignore[untyped-decorator]
     def now_playing(player_id: str = "") -> str:
         """Summarise what's currently playing on a player (or all players)."""
         if player_id:

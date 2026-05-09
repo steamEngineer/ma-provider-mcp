@@ -6,8 +6,11 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from .constants import (
+    CONF_ENFORCE_AUDIENCE,
+    CONF_EXTRA_ALLOWED_ORIGINS,
     CONF_MOUNT_PATH,
     CONF_REQUIRE_AUTH,
+    CONF_REQUIRE_CONFIRMATION,
     DEFAULT_MOUNT_PATH,
 )
 from .tags import enabled_tags
@@ -55,6 +58,10 @@ class MCPServerRuntime:
         self._mount_path: str = str(config.get_value(CONF_MOUNT_PATH) or DEFAULT_MOUNT_PATH)
         self._mcp: Any = None
         self._unmount: Callable[[], None] | None = None
+        self._unmount_well_known: Callable[[], None] | None = None
+        # Mutable so apply_permission_change can hot-swap the allowed-tag set
+        # without re-instantiating the TagFilterMiddleware closure.
+        self._allowed_tags: set[str] = set()
 
     @property
     def public_url(self) -> str:
@@ -82,7 +89,19 @@ class MCPServerRuntime:
         )
 
         require_auth = bool(self._config.get_value(CONF_REQUIRE_AUTH))
-        verifier = MASTokenVerifier(self._mass) if require_auth else None
+        base_url = str(getattr(self._mass.webserver, "base_url", "") or "").rstrip("/")
+        public_resource_uri = f"{base_url}{self._mount_path}" if base_url else None
+        enforce_audience = bool(self._config.get_value(CONF_ENFORCE_AUDIENCE))
+        verifier = (
+            MASTokenVerifier(
+                self._mass,
+                base_url=base_url or None,
+                public_resource_uri=public_resource_uri,
+                enforce_audience=enforce_audience,
+            )
+            if require_auth
+            else None
+        )
 
         mcp = FastMCP(
             name="music-assistant",
@@ -97,22 +116,56 @@ class MCPServerRuntime:
             auth=verifier,
         )
 
+        require_confirmation = bool(
+            self._config.get_value(CONF_REQUIRE_CONFIRMATION) or False
+        )
         mcp.mount(build_library_server(self._mass), namespace="library")
-        mcp.mount(build_queue_server(self._mass), namespace="queue")
+        mcp.mount(
+            build_queue_server(self._mass, require_confirmation=require_confirmation),
+            namespace="queue",
+        )
         mcp.mount(build_playback_server(self._mass), namespace="playback")
         mcp.mount(build_players_server(self._mass), namespace="players")
-        mcp.mount(build_playlists_server(self._mass), namespace="playlists")
+        mcp.mount(
+            build_playlists_server(self._mass, require_confirmation=require_confirmation),
+            namespace="playlists",
+        )
         mcp.mount(build_volume_server(self._mass), namespace="volume")
-        mcp.mount(build_media_server(self._mass), namespace="media")
+        mcp.mount(
+            build_media_server(self._mass, require_confirmation=require_confirmation),
+            namespace="media",
+        )
         mcp.mount(build_metadata_server(self._mass), namespace="metadata")
 
         register_resources(mcp, self._mass, self._config)
-        register_prompts(mcp, self._mass, self._config)
+        register_prompts(mcp, self._config)
 
         self._apply_tag_filter(mcp, enabled_tags(self._config))
 
         self._mcp = mcp
-        self._unmount = await mount_into_mass(self._mass, mcp, self._mount_path)
+        extra_origins = str(self._config.get_value(CONF_EXTRA_ALLOWED_ORIGINS) or "")
+        self._unmount = await mount_into_mass(
+            self._mass, mcp, self._mount_path, extra_origins_csv=extra_origins
+        )
+
+        # Publish RFC 9728 protected-resource metadata at the well-known URL
+        # advertised by FastMCP in WWW-Authenticate. Skipped when require_auth
+        # is off (no metadata to serve) or base_url is missing (no canonical URI).
+        if require_auth and public_resource_uri:
+            from .http_bridge import mount_well_known  # noqa: PLC0415
+
+            self._unmount_well_known = await mount_well_known(
+                self._mass,
+                mount_path=self._mount_path,
+                resource_uri=public_resource_uri,
+                authorization_servers=[base_url],
+                # Lazy provider so hot-swapped permissions update the
+                # advertised `scopes_supported` immediately, without
+                # rebuilding the runtime.
+                scopes_supported=lambda: [str(t) for t in enabled_tags(self._config)],
+                resource_name="Music Assistant MCP",
+            )
+
         self._logger.debug(
             "MCP runtime started: mount=%s, auth=%s, tags=%d",
             self._mount_path,
@@ -128,6 +181,12 @@ class MCPServerRuntime:
             except Exception:
                 self._logger.exception("Failed to unregister MCP route")
             self._unmount = None
+        if getattr(self, "_unmount_well_known", None) is not None:
+            try:
+                self._unmount_well_known()  # type: ignore[misc]
+            except Exception:
+                self._logger.exception("Failed to unregister well-known route")
+            self._unmount_well_known = None
         self._mcp = None
 
     async def apply_permission_change(self, new_config: ProviderConfig) -> None:
@@ -162,7 +221,7 @@ class MCPServerRuntime:
         try:
             old_values = old.values if hasattr(old, "values") else {}
             new_values = new.values if hasattr(new, "values") else {}
-        except Exception:
+        except (AttributeError, TypeError):
             return set()
         keys = set(old_values) | set(new_values)
         return {k for k in keys if old_values.get(k) != new_values.get(k)}
@@ -171,8 +230,31 @@ class MCPServerRuntime:
         """Install the tag-filter middleware on the given FastMCP server."""
         from .middleware import TagFilterMiddleware  # noqa: PLC0415
 
-        # Snapshot tags into a tuple captured by the closure below. The closure
-        # form lets us swap the allowed set later via apply_permission_change
-        # without re-instantiating the middleware (single source of truth).
-        self._allowed_tags: set[str] = {str(t) for t in allowed}
-        mcp.add_middleware(TagFilterMiddleware(lambda: self._allowed_tags))
+        # Snapshot tags into the closure-captured set declared in __init__.
+        # apply_permission_change mutates the same set later, so the
+        # middleware sees the new permissions without rebuilding FastMCP.
+        self._allowed_tags = {str(t) for t in allowed}
+
+        async def lookup(kind: str, key: str) -> set[str] | None:
+            """Resolve component name/URI back to its tag set via FastMCP public API.
+
+            Returns ``None`` if the component is unknown — middleware then blocks
+            the call with NotFoundError, preventing a client that cached a name
+            from a prior permission set from invoking a now-hidden tool.
+            """
+            try:
+                if kind == "tool":
+                    obj = await mcp.get_tool(key)
+                elif kind == "resource":
+                    obj = await mcp.get_resource(key)
+                elif kind == "prompt":
+                    obj = await mcp.get_prompt(key)
+                else:  # pragma: no cover - kind is Literal-typed at the caller
+                    return None
+            except Exception:
+                return None
+            if obj is None:
+                return None
+            return {str(t) for t in (getattr(obj, "tags", None) or set())}
+
+        mcp.add_middleware(TagFilterMiddleware(lambda: self._allowed_tags, lookup))

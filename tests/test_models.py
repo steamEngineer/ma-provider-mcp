@@ -134,6 +134,30 @@ def test_to_brief_queue_with_items() -> None:
     assert brief.items[0].artists == ["A1"]
 
 
+def test_to_brief_queue_uses_canonical_items_int_for_count() -> None:
+    """``items`` (int) on the canonical PlayerQueue is the **total** length.
+
+    Earlier code mis-fell back to len(brief_items) (the truncated lookahead),
+    under-reporting real queue depth. ``items_count`` from the truncated
+    lookahead must not win over the explicit total.
+    """
+    queue = SimpleNamespace(
+        queue_id="q",
+        current_index=0,
+        items=42,  # canonical MA: total length, not a list
+        shuffle_enabled=False,
+        repeat_mode=None,
+    )
+    # Pass only 5 items as the truncated lookahead.
+    truncated = [
+        SimpleNamespace(queue_item_id=str(i), name=f"t{i}", duration=60, media_item=None)
+        for i in range(5)
+    ]
+    brief = to_brief_queue(queue, items=truncated)
+    assert brief.item_count == 42  # not 5
+    assert len(brief.items) == 5
+
+
 def test_page_args_clamps() -> None:
     """``page_args`` clamps negatives and oversized limits."""
     assert page_args(-5, 5000) == (0, 200)

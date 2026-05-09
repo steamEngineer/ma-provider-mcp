@@ -13,6 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  contents: read  # Required by actions/checkout in the reusable workflow
   issues: write  # Required by report-failure job in reusable workflow
 
 jobs:

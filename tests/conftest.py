@@ -5,6 +5,11 @@ logic (URI parsing, tag mapping, config entries shape) or use ``MagicMock``
 for ``mass``. Integration-level tests that need a real MA stack are marked
 with ``@pytest.mark.integration`` and skipped by default.
 """
+# ruff: noqa: D401, PLR0915
+#   D401: fixture docstrings describe *what is returned* ("A stub …"), not
+#         imperative actions; rephrasing to "Build / Return …" hurts grep-ability.
+#   PLR0915: ``mock_mass`` builds a tall MagicMock surface — splitting it across
+#            helpers obscures the test contract.
 
 from __future__ import annotations
 
@@ -24,6 +29,66 @@ if TYPE_CHECKING:
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
+
+
+class FakeWebserver:
+    """Captures every dynamic-route registration so tests can drive them through aiohttp.
+
+    Mirrors the surface of ``mass.webserver`` that this plugin uses, without
+    depending on a real Music Assistant install. Exposed via the
+    :func:`fake_webserver` fixture and :func:`build_aiohttp_app` helper.
+    """
+
+    def __init__(
+        self,
+        *,
+        base_url: str = "http://localhost:8095",
+        publish_ip: str = "127.0.0.1",
+    ) -> None:
+        """Initialise an empty registry with the given advertised endpoints."""
+        self.routes: list[tuple[str, Any, str]] = []
+        self.base_url = base_url
+        self.publish_ip = publish_ip
+
+    def register_dynamic_route(
+        self, path: str, handler: Any, method: str = "*"
+    ) -> Any:
+        """Mirror ``mass.webserver.register_dynamic_route``: store + return unregister."""
+        import contextlib  # noqa: PLC0415 - keep stdlib import inside method to mirror runtime
+
+        self.routes.append((path, handler, method))
+
+        def _unregister() -> None:
+            with contextlib.suppress(ValueError):
+                self.routes.remove((path, handler, method))
+
+        return _unregister
+
+    @property
+    def handler(self) -> Any:
+        """Return the single registered handler (convenience for one-route tests)."""
+        return self.routes[0][1] if self.routes else None
+
+
+def build_aiohttp_app(fake_ws: FakeWebserver) -> Any:
+    """Translate captured ``(path, handler, method)`` tuples into an aiohttp app."""
+    from aiohttp import web  # noqa: PLC0415 - aiohttp only needed by HTTP-level tests
+
+    app = web.Application()
+    for path, handler, method in fake_ws.routes:
+        if path.endswith("/*"):
+            stem = path[:-2]
+            app.router.add_route(method, f"{stem}/{{tail:.*}}", handler)
+        else:
+            normalized = method if method != "*" else "GET"
+            app.router.add_route(normalized, path, handler)
+    return app
+
+
+@pytest.fixture
+def fake_webserver() -> FakeWebserver:
+    """Fresh ``FakeWebserver`` instance per test."""
+    return FakeWebserver()
 
 
 @pytest.fixture
@@ -114,6 +179,9 @@ def mock_config() -> MagicMock:
         # Defaults match build_config_entries
         "require_auth": True,
         "mount_path": "/mcp/v1",
+        "extra_allowed_origins": "",
+        "enforce_audience": False,
+        "require_confirmation": True,
         "query_library": True,
         "query_queue": True,
         "query_players": True,

@@ -5,6 +5,9 @@ from __future__ import annotations
 # ── Server settings ────────────────────────────────────────────────────────────
 CONF_REQUIRE_AUTH = "require_auth"
 CONF_MOUNT_PATH = "mount_path"
+CONF_EXTRA_ALLOWED_ORIGINS = "extra_allowed_origins"
+CONF_ENFORCE_AUDIENCE = "enforce_audience"
+CONF_REQUIRE_CONFIRMATION = "require_confirmation"
 
 DEFAULT_MOUNT_PATH = "/mcp/v1"
 
