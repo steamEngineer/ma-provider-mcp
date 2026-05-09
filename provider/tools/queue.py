@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 from ..models import QueueBrief
 from ..tags import Tag
@@ -18,7 +19,16 @@ def build_queue_server(mass: MusicAssistant) -> FastMCP:
     """Construct the ``queue/*`` sub-server."""
     sub: FastMCP = FastMCP(name="queue")
 
-    @sub.tool(tags={Tag.QUERY_QUEUE})
+    @sub.tool(
+        tags={Tag.QUERY_QUEUE},
+        annotations=ToolAnnotations(
+            title="Get active queue",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def get_active_queue(player_id: str, include_items: int = 25) -> QueueBrief:
         """Return the active queue for a player, including up to ``include_items`` lookahead."""
         queue = mass.player_queues.get_active_queue(player_id)
@@ -30,12 +40,30 @@ def build_queue_server(mass: MusicAssistant) -> FastMCP:
         items = list(raw)[: max(0, include_items)] if include_items > 0 else []
         return to_brief_queue(queue, items=items)
 
-    @sub.tool(tags={Tag.EDIT_QUEUE})
+    @sub.tool(
+        tags={Tag.EDIT_QUEUE},
+        annotations=ToolAnnotations(
+            title="Toggle queue shuffle",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def set_shuffle(queue_id: str, enabled: bool) -> None:
         """Enable or disable shuffle on the given queue."""
         await mass.player_queues.set_shuffle(queue_id, enabled)
 
-    @sub.tool(tags={Tag.DELETE_QUEUE})
+    @sub.tool(
+        tags={Tag.DELETE_QUEUE},
+        annotations=ToolAnnotations(
+            title="Clear queue",
+            readOnlyHint=False,
+            destructiveHint=True,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def clear_queue(queue_id: str) -> None:
         """Clear all items from the given queue.
 
@@ -48,7 +76,16 @@ def build_queue_server(mass: MusicAssistant) -> FastMCP:
             raise RuntimeError(msg)
         await clear(queue_id)
 
-    @sub.tool(tags={Tag.CONTROL_PLAYBACK})
+    @sub.tool(
+        tags={Tag.CONTROL_PLAYBACK},
+        annotations=ToolAnnotations(
+            title="Transfer queue between players",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def transfer_queue(source_queue_id: str, target_queue_id: str) -> None:
         """Move a queue from one player to another."""
         await mass.player_queues.transfer_queue(source_queue_id, target_queue_id)

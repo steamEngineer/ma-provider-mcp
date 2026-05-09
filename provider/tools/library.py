@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
 from ..models import (
     AlbumBrief,
@@ -27,11 +28,31 @@ if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
 
 
+def _readonly(title: str) -> ToolAnnotations:
+    """Read-only library tool annotations with the supplied UI title."""
+    return ToolAnnotations(
+        title=title,
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+
+
 def build_library_server(mass: MusicAssistant) -> FastMCP:
     """Construct the ``library/*`` sub-server."""
     sub: FastMCP = FastMCP(name="library")
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(
+        tags={Tag.QUERY_LIBRARY},
+        annotations=ToolAnnotations(
+            title="Search tracks",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def search_tracks(query: str, limit: int = 25) -> list[TrackBrief]:
         """Search for tracks by free-text query across all enabled providers."""
         from music_assistant_models.enums import MediaType  # noqa: PLC0415
@@ -39,7 +60,16 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
         results = await mass.music.search(query, [MediaType.TRACK], limit=limit)
         return [to_brief_track(t) for t in (results.tracks or [])]
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(
+        tags={Tag.QUERY_LIBRARY},
+        annotations=ToolAnnotations(
+            title="Search albums",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def search_albums(query: str, limit: int = 25) -> list[AlbumBrief]:
         """Search for albums by free-text query."""
         from music_assistant_models.enums import MediaType  # noqa: PLC0415
@@ -47,7 +77,16 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
         results = await mass.music.search(query, [MediaType.ALBUM], limit=limit)
         return [to_brief_album(a) for a in (results.albums or [])]
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(
+        tags={Tag.QUERY_LIBRARY},
+        annotations=ToolAnnotations(
+            title="Search artists",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def search_artists(query: str, limit: int = 25) -> list[ArtistBrief]:
         """Search for artists by free-text query."""
         from music_assistant_models.enums import MediaType  # noqa: PLC0415
@@ -55,48 +94,48 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
         results = await mass.music.search(query, [MediaType.ARTIST], limit=limit)
         return [to_brief_artist(a) for a in (results.artists or [])]
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(tags={Tag.QUERY_LIBRARY}, annotations=_readonly("List library tracks"))
     async def list_library_tracks(offset: int = 0, limit: int = 50) -> list[TrackBrief]:
         """List tracks already in the user's library, paginated."""
         offset, limit = page_args(offset, limit)
         items = await mass.music.tracks.library_items(limit=limit, offset=offset)
         return [to_brief_track(t) for t in items]
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(tags={Tag.QUERY_LIBRARY}, annotations=_readonly("List library albums"))
     async def list_library_albums(offset: int = 0, limit: int = 50) -> list[AlbumBrief]:
         """List albums already in the user's library, paginated."""
         offset, limit = page_args(offset, limit)
         items = await mass.music.albums.library_items(limit=limit, offset=offset)
         return [to_brief_album(a) for a in items]
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(tags={Tag.QUERY_LIBRARY}, annotations=_readonly("List library artists"))
     async def list_library_artists(offset: int = 0, limit: int = 50) -> list[ArtistBrief]:
         """List artists already in the user's library, paginated."""
         offset, limit = page_args(offset, limit)
         items = await mass.music.artists.library_items(limit=limit, offset=offset)
         return [to_brief_artist(a) for a in items]
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(tags={Tag.QUERY_LIBRARY}, annotations=_readonly("List library playlists"))
     async def list_library_playlists(offset: int = 0, limit: int = 50) -> list[PlaylistBrief]:
         """List playlists already in the user's library, paginated."""
         offset, limit = page_args(offset, limit)
         items = await mass.music.playlists.library_items(limit=limit, offset=offset)
         return [to_brief_playlist(p) for p in items]
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(tags={Tag.QUERY_LIBRARY}, annotations=_readonly("List library radio"))
     async def list_library_radio(offset: int = 0, limit: int = 50) -> list[RadioBrief]:
         """List radio stations already in the user's library, paginated."""
         offset, limit = page_args(offset, limit)
         items = await mass.music.radio.library_items(limit=limit, offset=offset)
         return [to_brief_radio(r) for r in items]
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(tags={Tag.QUERY_LIBRARY}, annotations=_readonly("Get track by URI"))
     async def get_track_by_uri(uri: str) -> TrackBrief:
         """Resolve a track by its MA URI to a brief summary."""
         item = await mass.music.get_item_by_uri(uri)
         return to_brief_track(item)
 
-    @sub.tool(tags={Tag.QUERY_LIBRARY})
+    @sub.tool(tags={Tag.QUERY_LIBRARY}, annotations=_readonly("Recently added tracks"))
     async def recently_added_tracks(limit: int = 10) -> list[TrackBrief]:
         """Return tracks recently added to the library."""
         items = await mass.music.recently_added_tracks(limit=limit)
