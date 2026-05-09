@@ -63,7 +63,7 @@ async def test_recommendations_runs_under_context(mock_mass: MagicMock) -> None:
         result = await client.call_tool("metadata_recommendations", {})
 
     text_blocks = [c.text for c in result.content if hasattr(c, "text")]
-    assert any('"items"' in t for t in text_blocks)
+    assert any("item_uris" in t or "Hits" in t for t in text_blocks)
 
 
 async def test_add_tracks_bulk_path_for_small_batch(mock_mass: MagicMock) -> None:

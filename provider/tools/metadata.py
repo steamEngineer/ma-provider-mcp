@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
-from ..models import TrackBrief
+from ..models import RecommendationFolderBrief, TrackBrief
 from ..tags import Tag
 from ._common import TIMEOUT_QUERY, to_brief_track
 
@@ -41,19 +41,21 @@ def build_metadata_server(mass: MusicAssistant) -> FastMCP:
         ),
         timeout=TIMEOUT_QUERY,
     )
-    async def recommendations(ctx: Context | None = None) -> list[dict[str, Any]]:
+    async def recommendations(
+        ctx: Context | None = None,
+    ) -> list[RecommendationFolderBrief]:
         """Return Music Assistant's curated recommendations folders."""
         if ctx is not None:
             await ctx.info("Fetching MA curated recommendations…")
         folders = await mass.music.recommendations()
-        result: list[dict[str, Any]] = []
+        result: list[RecommendationFolderBrief] = []
         for folder in folders:
             folder_items = getattr(folder, "items", None) or []
             result.append(
-                {
-                    "name": getattr(folder, "name", ""),
-                    "items": [str(getattr(it, "uri", "")) for it in folder_items],
-                }
+                RecommendationFolderBrief(
+                    name=str(getattr(folder, "name", "")),
+                    item_uris=[str(getattr(it, "uri", "")) for it in folder_items],
+                )
             )
         return result
 

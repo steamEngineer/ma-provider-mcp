@@ -91,3 +91,11 @@ class QueueBrief:
     shuffle: bool
     repeat: str
     items: list[QueueItemBrief] = field(default_factory=list)
+
+
+@dataclass
+class RecommendationFolderBrief:
+    """One curated recommendation folder (e.g. "Mood: Focus") with its track URIs."""
+
+    name: str
+    item_uris: list[str] = field(default_factory=list)
