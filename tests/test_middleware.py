@@ -4,12 +4,9 @@
 from __future__ import annotations
 
 import pytest
+from fastmcp import Client, FastMCP
 
-fastmcp = pytest.importorskip("fastmcp")
-
-from fastmcp import Client, FastMCP  # noqa: E402
-
-from provider.middleware import TagFilterMiddleware  # noqa: E402
+from provider.middleware import TagFilterMiddleware
 
 
 def _build_server(allowed: set[str]) -> FastMCP:
