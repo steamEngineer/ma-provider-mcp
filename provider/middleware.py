@@ -159,7 +159,5 @@ class TagFilterMiddleware(Middleware):
             return  # untagged → always-on
         allowed = self._allowed()
         if not any(t in allowed for t in tags):
-            msg = (
-                f"{kind.capitalize()} {key!r} is currently disabled by configuration"
-            )
+            msg = f"{kind.capitalize()} {key!r} is currently disabled by configuration"
             raise self._ERROR_BY_KIND[kind](msg)

@@ -17,9 +17,7 @@ if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
 
 
-def build_playlists_server(
-    mass: MusicAssistant, *, require_confirmation: bool = True
-) -> FastMCP:
+def build_playlists_server(mass: MusicAssistant, *, require_confirmation: bool = True) -> FastMCP:
     """Construct the ``playlists/*`` sub-server."""
     sub: FastMCP = FastMCP(name="playlists")
 

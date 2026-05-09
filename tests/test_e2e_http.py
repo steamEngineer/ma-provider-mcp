@@ -80,9 +80,7 @@ async def method_echo_client() -> Any:
 
 async def test_streaming_chunks_passed_through(streaming_client: TestClient) -> None:
     """Three ASGI body chunks reach the aiohttp client unbuffered."""
-    resp = await streaming_client.post(
-        "/mcp/v1/", headers={"Origin": "http://localhost:8095"}
-    )
+    resp = await streaming_client.post("/mcp/v1/", headers={"Origin": "http://localhost:8095"})
     assert resp.status == 200
     body = await resp.read()
     assert body == b"event0\nevent1\nevent2\n"
@@ -90,18 +88,14 @@ async def test_streaming_chunks_passed_through(streaming_client: TestClient) -> 
 
 async def test_delete_method_reaches_asgi(method_echo_client: TestClient) -> None:
     """Streamable-HTTP DELETE (session terminate) is forwarded — bridge does not 405."""
-    resp = await method_echo_client.delete(
-        "/mcp/v1/", headers={"Origin": "http://localhost:8095"}
-    )
+    resp = await method_echo_client.delete("/mcp/v1/", headers={"Origin": "http://localhost:8095"})
     assert resp.status == 200
     assert (await resp.read()) == b"DELETE"
 
 
 async def test_get_method_reaches_asgi(method_echo_client: TestClient) -> None:
     """GET is forwarded — required so FastMCP can open server-initiated SSE."""
-    resp = await method_echo_client.get(
-        "/mcp/v1/", headers={"Origin": "http://localhost:8095"}
-    )
+    resp = await method_echo_client.get("/mcp/v1/", headers={"Origin": "http://localhost:8095"})
     assert resp.status == 200
     assert (await resp.read()) == b"GET"
 
@@ -121,9 +115,7 @@ async def test_well_known_alongside_mcp_mount() -> None:
     )
     async with TestClient(TestServer(build_aiohttp_app(ws))) as client:
         # MCP endpoint reachable
-        resp = await client.post(
-            "/mcp/v1/", headers={"Origin": "http://localhost:8095"}
-        )
+        resp = await client.post("/mcp/v1/", headers={"Origin": "http://localhost:8095"})
         assert resp.status == 200
         # well-known sub-path returns RFC 9728 metadata
         meta = await client.get("/.well-known/oauth-protected-resource/mcp/v1")

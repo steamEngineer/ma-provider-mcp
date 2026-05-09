@@ -116,9 +116,7 @@ class MCPServerRuntime:
             auth=verifier,
         )
 
-        require_confirmation = bool(
-            self._config.get_value(CONF_REQUIRE_CONFIRMATION) or False
-        )
+        require_confirmation = bool(self._config.get_value(CONF_REQUIRE_CONFIRMATION) or False)
         mcp.mount(build_library_server(self._mass), namespace="library")
         mcp.mount(
             build_queue_server(self._mass, require_confirmation=require_confirmation),

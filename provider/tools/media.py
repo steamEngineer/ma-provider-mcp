@@ -33,9 +33,7 @@ async def _resolve_uri(mass: MusicAssistant, uri: str) -> Any:
         raise ToolError(msg) from exc
 
 
-def build_media_server(
-    mass: MusicAssistant, *, require_confirmation: bool = True
-) -> FastMCP:
+def build_media_server(mass: MusicAssistant, *, require_confirmation: bool = True) -> FastMCP:
     """Construct the ``media/*`` sub-server."""
     sub: FastMCP = FastMCP(name="media")
 

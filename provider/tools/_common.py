@@ -35,9 +35,7 @@ TIMEOUT_QUERY = 30.0
 TIMEOUT_BULK = 60.0
 
 
-async def confirm_or_raise(
-    ctx: Context | None, prompt: str, *, enabled: bool
-) -> None:
+async def confirm_or_raise(ctx: Context | None, prompt: str, *, enabled: bool) -> None:
     """Ask the MCP client to confirm a destructive operation.
 
     If ``enabled`` is False, or there is no Context (direct unit-test
