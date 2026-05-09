@@ -134,7 +134,7 @@ class MCPServerRuntime:
         mcp.mount(build_metadata_server(self._mass), namespace="metadata")
 
         register_resources(mcp, self._mass, self._config)
-        register_prompts(mcp, self._mass, self._config)
+        register_prompts(mcp, self._config)
 
         self._apply_tag_filter(mcp, enabled_tags(self._config))
 
@@ -215,7 +215,7 @@ class MCPServerRuntime:
         try:
             old_values = old.values if hasattr(old, "values") else {}
             new_values = new.values if hasattr(new, "values") else {}
-        except Exception:
+        except (AttributeError, TypeError):
             return set()
         keys = set(old_values) | set(new_values)
         return {k for k in keys if old_values.get(k) != new_values.get(k)}

@@ -101,7 +101,7 @@ def _compute_origin_allowlist(
 
 
 def _port_from_base_url(base_url: str) -> int | None:
-    """Helper: return explicit port from a URL, or None if it's the scheme default."""
+    """Return the explicit port from a URL, or ``None`` when it's the scheme default."""
     if not base_url:
         return None
     parts = urlsplit(base_url)

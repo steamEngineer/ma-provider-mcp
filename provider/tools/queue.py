@@ -32,13 +32,13 @@ def build_queue_server(
         ),
         timeout=TIMEOUT_FAST,
     )
-    async def get_active_queue(player_id: str, include_items: int = 25) -> QueueBrief:
-        """Return the active queue for a player, including up to ``include_items`` lookahead."""
+    async def get_active_queue(
+        player_id: str, include_items: int = 25
+    ) -> QueueBrief | None:
+        """Return the active queue for a player, or ``None`` if the player is idle."""
         queue = mass.player_queues.get_active_queue(player_id)
         if queue is None:
-            return QueueBrief(
-                queue_id="", current_index=None, item_count=0, shuffle=False, repeat="off"
-            )
+            return None
         raw = mass.player_queues.items(queue.queue_id)
         items = list(raw)[: max(0, include_items)] if include_items > 0 else []
         return to_brief_queue(queue, items=items)

@@ -17,27 +17,27 @@ def _build_server(allowed: set[str]) -> FastMCP:
 
     @mcp.tool(tags={"query"})
     async def reads() -> str:
-        """A read-only tool."""
+        """Return a read-only result."""
         return "ok"
 
     @mcp.tool(tags={"delete"})
     async def deletes() -> str:
-        """A destructive tool."""
+        """Pretend to perform a destructive action."""
         return "deleted"
 
     @mcp.tool
     async def untagged() -> str:
-        """A tool with no tags — always exposed."""
+        """Return a value from an untagged tool — always exposed."""
         return "untagged"
 
     @mcp.resource("data://thing/{thing_id}", tags={"query"})
     async def thing(thing_id: str) -> str:
-        """A read-only resource."""
+        """Return a read-only resource value for the given id."""
         return f"thing:{thing_id}"
 
     @mcp.prompt(name="suggest", tags={"query"})
     def suggest() -> str:
-        """A prompt template."""
+        """Return a sample prompt template."""
         return "Pick something."
 
     async def lookup(kind: str, key: str) -> set[str] | None:

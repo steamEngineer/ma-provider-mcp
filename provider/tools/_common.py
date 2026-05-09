@@ -154,12 +154,15 @@ def to_brief_queue(queue: Any, items: Sequence[Any] | None = None) -> QueueBrief
                     artists=_names(getattr(getattr(it, "media_item", None), "artists", None)),
                 )
             )
+    # MA's PlayerQueue exposes total length via items_count or items_total in
+    # different builds; fall back to the count of brief items we already built.
+    explicit_count = _int(
+        getattr(queue, "items_count", None) or getattr(queue, "items_total", None)
+    )
     return QueueBrief(
         queue_id=str(getattr(queue, "queue_id", "")),
         current_index=_int(getattr(queue, "current_index", None)),
-        item_count=int(getattr(queue, "items", 0) or 0)
-        if isinstance(getattr(queue, "items", 0), int)
-        else len(brief_items),
+        item_count=explicit_count if explicit_count is not None else len(brief_items),
         shuffle=bool(getattr(queue, "shuffle_enabled", False)),
         repeat=repeat_value,
         items=brief_items,

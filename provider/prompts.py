@@ -15,10 +15,8 @@ from .constants import CONF_RES_PROMPTS
 if TYPE_CHECKING:
     from music_assistant_models.config_entries import ProviderConfig
 
-    from music_assistant.mass import MusicAssistant
 
-
-def register_prompts(mcp: Any, mass: MusicAssistant, config: ProviderConfig) -> None:  # noqa: ARG001
+def register_prompts(mcp: Any, config: ProviderConfig) -> None:
     """Register canned prompts on the FastMCP root, gated by ``CONF_RES_PROMPTS``."""
     if not config.get_value(CONF_RES_PROMPTS):
         return

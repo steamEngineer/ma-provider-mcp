@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
+from music_assistant_models.enums import MediaType
 
 from ..models import (
     AlbumBrief,
@@ -59,8 +60,6 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
         query: str, limit: int = 25, ctx: Context | None = None
     ) -> list[TrackBrief]:
         """Search for tracks by free-text query across all enabled providers."""
-        from music_assistant_models.enums import MediaType  # noqa: PLC0415
-
         if ctx is not None:
             await ctx.info(f"Searching MA for tracks matching {query!r} (limit={limit})")
         results = await mass.music.search(query, [MediaType.TRACK], limit=limit)
@@ -81,8 +80,6 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
         query: str, limit: int = 25, ctx: Context | None = None
     ) -> list[AlbumBrief]:
         """Search for albums by free-text query."""
-        from music_assistant_models.enums import MediaType  # noqa: PLC0415
-
         if ctx is not None:
             await ctx.info(f"Searching MA for albums matching {query!r} (limit={limit})")
         results = await mass.music.search(query, [MediaType.ALBUM], limit=limit)
@@ -103,8 +100,6 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
         query: str, limit: int = 25, ctx: Context | None = None
     ) -> list[ArtistBrief]:
         """Search for artists by free-text query."""
-        from music_assistant_models.enums import MediaType  # noqa: PLC0415
-
         if ctx is not None:
             await ctx.info(f"Searching MA for artists matching {query!r} (limit={limit})")
         results = await mass.music.search(query, [MediaType.ARTIST], limit=limit)
