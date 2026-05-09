@@ -8,7 +8,7 @@ export default defineConfig({
 	base: '/ma-provider-mcp',
 	integrations: [
 		starlight({
-			title: 'MCP Server · MA Provider',
+			title: 'FastMCP Server · MA Provider',
 			editLink: {
 				baseUrl: 'https://github.com/trudenboy/ma-provider-mcp/edit/dev/docs-site/src/content/docs/',
 			},

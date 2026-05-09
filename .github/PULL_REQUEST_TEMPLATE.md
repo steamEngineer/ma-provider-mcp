@@ -1,4 +1,4 @@
-<!-- MCP Server pull request template -->
+<!-- FastMCP Server pull request template -->
 ## Description
 
 <!-- What does this PR do? Why is it needed? -->

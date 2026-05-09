@@ -4,7 +4,7 @@ title: Contributing
 
 # Contributing
 
-Thank you for your interest in contributing to **MCP Server**!
+Thank you for your interest in contributing to **FastMCP Server**!
 
 ## Code of Conduct
 

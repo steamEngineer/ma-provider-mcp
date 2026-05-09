@@ -4,7 +4,7 @@ title: Incident Management
 
 [← README](../README.md)
 
-# MCP Server — Incident Management
+# FastMCP Server — Incident Management
 
 ## Where to Report Incidents
 
@@ -67,7 +67,7 @@ Many incidents are created automatically without manual intervention:
 All issues labeled `incident:*` are automatically added to the project board:
 
 - **Addition**: `issue-project.yml` triggers when an issue is opened or labeled
-- **Provider field**: Set automatically for MCP Server
+- **Provider field**: Set automatically for FastMCP Server
 - **Release tracking**: `reusable-release.yml` creates a draft issue in the project on each release
 
 ## Copilot Triage

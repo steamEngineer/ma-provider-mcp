@@ -4,7 +4,7 @@ title: Testing
 
 [← Development](development.md) · [← Contributing](contributing.md) · [README](../README.md)
 
-# MCP Server — Testing Guide
+# FastMCP Server — Testing Guide
 
 ## Quick Start
 

@@ -1,5 +1,5 @@
-# Development docker-compose for MCP Server
-# Runs a local Music Assistant instance with MCP Server provider pre-loaded.
+# Development docker-compose for FastMCP Server
+# Runs a local Music Assistant instance with FastMCP Server provider pre-loaded.
 #
 # Usage:
 #   docker compose -f docker-compose.dev.yml up       # foreground

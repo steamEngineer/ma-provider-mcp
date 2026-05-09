@@ -2,9 +2,9 @@
 title: Docker
 ---
 
-# MCP Server — Local Development with Docker
+# FastMCP Server — Local Development with Docker
 
-Run a full Music Assistant instance with MCP Server provider pre-loaded locally —
+Run a full Music Assistant instance with FastMCP Server provider pre-loaded locally —
 no Python, FFmpeg, or other dependencies required.
 
 ## Prerequisites
@@ -27,12 +27,12 @@ On first launch, Music Assistant runs an onboarding wizard:
 2. Skip the Home Assistant integration if prompted
 3. Your login state persists between container restarts via the `.ma-data/` volume
 
-## Adding the MCP Server Provider
+## Adding the FastMCP Server Provider
 
 After login:
 
 1. Go to **Settings** → **Providers**
-2. Find **MCP Server** in the list — it's already available, the code is pre-loaded
+2. Find **FastMCP Server** in the list — it's already available, the code is pre-loaded
 3. Click **Add** and enter your credentials
 4. Provider configuration is saved to `.ma-data/` and persists across restarts
 

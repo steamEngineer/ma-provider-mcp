@@ -13,7 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read  # Required by actions/checkout in the reusable workflow
   issues: write  # Required by report-failure job in reusable workflow
 
 jobs:
@@ -21,6 +20,6 @@ jobs:
     uses: trudenboy/ma-provider-tools/.github/workflows/reusable-test.yml@main
     with:
       provider_type: plugin_provider
-      provider_domain: mcp_server
+      provider_domain: fastmcp_server
       provider_path: provider/
       manifest_path: provider/manifest.json
