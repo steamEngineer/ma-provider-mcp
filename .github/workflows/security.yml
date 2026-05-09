@@ -29,6 +29,6 @@ jobs:
     uses: trudenboy/ma-provider-tools/.github/workflows/reusable-security.yml@main
     with:
       provider_type: "plugin_provider"
-      provider_domain: "mcp_server"
+      provider_domain: "fastmcp_server"
       provider_path: "provider/"
       manifest_path: "provider/manifest.json"

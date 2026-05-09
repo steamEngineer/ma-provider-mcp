@@ -1,7 +1,7 @@
 <!-- ma-provider-tools: rendered from wrappers/CLAUDE.md.j2 -->
 # CLAUDE.md
 
-This file aligns development of the **MCP Server** provider with the
+This file aligns development of the **FastMCP Server** provider with the
 upstream [`music-assistant/server`](https://github.com/music-assistant/server)
 standards. It is rendered from `wrappers/CLAUDE.md.j2` in
 [`trudenboy/ma-provider-tools`](https://github.com/trudenboy/ma-provider-tools)
@@ -95,7 +95,7 @@ upstream PR submission run automatically through `ma-provider-tools`
 workflows (`sync-to-fork.yml`, `upstream-pr.yml`).
 
 This provider is intended to be inlined into
-`music_assistant/providers/mcp_server` upstream eventually — that is the
+`music_assistant/providers/fastmcp_server` upstream eventually — that is the
 target shape, not a possibility. Any code that lints / type-checks here
 must lint / type-check identically upstream.
 

@@ -1,6 +1,6 @@
 ---
 title: Dev Environment
-description: Setting up the development environment for MCP Server provider
+description: Setting up the development environment for FastMCP Server provider
 ---
 
 
@@ -88,7 +88,7 @@ For simultaneous development of multiple providers with a shared MA server:
 python3 scripts/dev-workspace.py init --dir ~/ma-workspace --all
 
 # Add a specific provider to an existing workspace:
-python3 scripts/dev-workspace.py add mcp_server
+python3 scripts/dev-workspace.py add fastmcp_server
 
 # Connect this repository to a workspace:
 ./scripts/setup.sh --workspace ~/ma-workspace
