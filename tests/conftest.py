@@ -114,6 +114,8 @@ def mock_config() -> MagicMock:
         # Defaults match build_config_entries
         "require_auth": True,
         "mount_path": "/mcp/v1",
+        "extra_allowed_origins": "",
+        "enforce_audience": False,
         "query_library": True,
         "query_queue": True,
         "query_players": True,

@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from .constants import (
+    CONF_ENFORCE_AUDIENCE,
     CONF_EXTRA_ALLOWED_ORIGINS,
     CONF_MOUNT_PATH,
     CONF_REQUIRE_AUTH,
@@ -85,11 +86,13 @@ class MCPServerRuntime:
         require_auth = bool(self._config.get_value(CONF_REQUIRE_AUTH))
         base_url = str(getattr(self._mass.webserver, "base_url", "") or "").rstrip("/")
         public_resource_uri = f"{base_url}{self._mount_path}" if base_url else None
+        enforce_audience = bool(self._config.get_value(CONF_ENFORCE_AUDIENCE))
         verifier = (
             MASTokenVerifier(
                 self._mass,
                 base_url=base_url or None,
                 public_resource_uri=public_resource_uri,
+                enforce_audience=enforce_audience,
             )
             if require_auth
             else None

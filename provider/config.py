@@ -20,6 +20,7 @@ from .constants import (
     CONF_EDIT_LIBRARY,
     CONF_EDIT_PLAYLISTS,
     CONF_EDIT_QUEUE,
+    CONF_ENFORCE_AUDIENCE,
     CONF_EXTRA_ALLOWED_ORIGINS,
     CONF_MOUNT_PATH,
     CONF_QUERY_LIBRARY,
@@ -97,6 +98,24 @@ def build_config_entries(
             description=(
                 "HTTP path prefix where the MCP server is mounted on MA's webserver. "
                 "Change only if it conflicts with another route."
+            ),
+            required=False,
+        ),
+        ConfigEntry(
+            key=CONF_ENFORCE_AUDIENCE,
+            type=ConfigEntryType.BOOLEAN,
+            label="Enforce token audience (RFC 8707)",
+            default_value=False,
+            category="Server",
+            advanced=True,
+            description=(
+                "Reject Bearer tokens whose `aud` claim does not match this MCP "
+                "server's canonical URI. Mitigates the OAuth confused-deputy "
+                "attack where a token issued for one MA endpoint is replayed "
+                "against another. Requires upstream Music Assistant support for "
+                "writing `aud` into JWTs (in progress) — until then enabling "
+                "this rejects all existing tokens. Leave off unless your MA "
+                "build issues audience-bound tokens."
             ),
             required=False,
         ),

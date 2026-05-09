@@ -14,6 +14,9 @@ lets FastMCP's built-in ``RequireAuthMiddleware`` populate the
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -26,6 +29,41 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+def _extract_jwt_audience(token: str) -> str | list[str] | None:
+    """Best-effort decode of a JWT payload to extract the ``aud`` claim.
+
+    Returns ``None`` for non-JWT tokens (legacy MA hash tokens), malformed
+    payloads, or JWTs without an ``aud`` claim. Does **not** verify the
+    signature — that's MA's responsibility via ``authenticate_with_token``;
+    we only read the audience claim to compare against this MCP server's
+    canonical URI.
+    """
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    payload_segment = parts[1]
+    # Restore base64url padding stripped by JWT spec.
+    pad = "=" * (-len(payload_segment) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(payload_segment + pad)
+        claims = json.loads(raw)
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        return None
+    aud = claims.get("aud") if isinstance(claims, dict) else None
+    if isinstance(aud, str | list) or aud is None:
+        return aud
+    return None
+
+
+def _audience_matches(aud: str | list[str] | None, expected: str) -> bool:
+    """RFC 8707: token is bound to ``expected`` if its ``aud`` is or contains it."""
+    if aud is None:
+        return False
+    if isinstance(aud, str):
+        return aud == expected
+    return expected in aud
+
+
 class MASTokenVerifier(TokenVerifier):
     """Verify Bearer tokens against ``mass.webserver.auth``."""
 
@@ -35,6 +73,7 @@ class MASTokenVerifier(TokenVerifier):
         *,
         base_url: str | None = None,
         public_resource_uri: str | None = None,
+        enforce_audience: bool = False,
     ) -> None:
         """Bind the verifier to a MusicAssistant instance.
 
@@ -45,10 +84,15 @@ class MASTokenVerifier(TokenVerifier):
         :param public_resource_uri: Canonical URI of the MCP server (the value
             FastMCP will report as ``resource``). Used to populate
             ``AccessToken.resource`` so downstream code can audience-check.
+        :param enforce_audience: When ``True``, reject Bearer tokens whose
+            ``aud`` claim is missing or does not contain ``public_resource_uri``.
+            When ``False`` (default), only logs a warning so operators can
+            migrate gracefully once MA-side issues audience-bound tokens.
         """
         super().__init__(base_url=base_url) if base_url else super().__init__()
         self._mass = mass
         self._public_resource_uri = public_resource_uri
+        self._enforce_audience = enforce_audience
 
     async def verify_token(self, token: str) -> AccessToken | None:
         """Validate the bearer token and produce an ``AccessToken`` for FastMCP.
@@ -66,6 +110,9 @@ class MASTokenVerifier(TokenVerifier):
         if user is None or not getattr(user, "enabled", True):
             return None
 
+        if not self._check_audience(token):
+            return None
+
         # MCP SDK's AccessToken pydantic model has no `claims` field — extras
         # are silently dropped — so we don't try to forward username/role here.
         return AccessToken(
@@ -75,3 +122,38 @@ class MASTokenVerifier(TokenVerifier):
             expires_at=None,
             resource=self._public_resource_uri,
         )
+
+    def _check_audience(self, token: str) -> bool:
+        """Return ``True`` if the token's audience is acceptable for this server.
+
+        In soft mode (``enforce_audience=False``) — always returns ``True`` and
+        only emits a warning when a JWT's ``aud`` is missing or mismatched.
+        In strict mode — rejects tokens missing or with a wrong ``aud``.
+        Non-JWT (legacy hash) tokens have no claim to inspect: they pass in
+        soft mode and fail in strict mode.
+        """
+        expected = self._public_resource_uri
+        if not expected:
+            return True
+        aud = _extract_jwt_audience(token)
+        if _audience_matches(aud, expected):
+            return True
+        if self._enforce_audience:
+            LOGGER.warning(
+                "Rejected token: aud=%r does not match MCP resource URI %r",
+                aud,
+                expected,
+            )
+            return False
+        if aud is None:
+            LOGGER.debug(
+                "Token has no `aud` claim; accepting because enforce_audience=False",
+            )
+        else:
+            LOGGER.warning(
+                "Token aud=%r does not match resource URI %r; accepting because "
+                "enforce_audience=False (set CONF_ENFORCE_AUDIENCE to enforce).",
+                aud,
+                expected,
+            )
+        return True
