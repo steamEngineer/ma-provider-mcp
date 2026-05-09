@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from fastmcp.exceptions import ToolError
+
 from ..models import (
     AlbumBrief,
     ArtistBrief,
@@ -18,8 +20,36 @@ from ..models import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from fastmcp import Context
+
 MAX_PAGE = 200
 DEFAULT_PAGE = 50
+
+
+async def confirm_or_raise(
+    ctx: Context | None, prompt: str, *, enabled: bool
+) -> None:
+    """Ask the MCP client to confirm a destructive operation.
+
+    If ``enabled`` is False, or there is no Context (direct unit-test
+    invocation), or the client returns ``NotImplementedError`` (no elicit
+    support), the call passes through silently — the permission flag is
+    still in effect as the primary defense.
+
+    On user decline / cancel, raises ``ToolError`` so the SDK reports it as
+    a tool-execution error (``isError: true``) rather than a protocol error.
+    """
+    if not enabled or ctx is None:
+        return
+    try:
+        result = await ctx.elicit(prompt, response_type=bool)
+    except NotImplementedError:
+        return
+    action = getattr(result, "action", None)
+    data = getattr(result, "data", None)
+    if action != "accept" or not data:
+        msg = "Operation cancelled by user"
+        raise ToolError(msg)
 
 
 def page_args(offset: int = 0, limit: int = DEFAULT_PAGE) -> tuple[int, int]:

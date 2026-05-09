@@ -9,13 +9,15 @@ from mcp.types import ToolAnnotations
 
 from ..models import PlaylistBrief
 from ..tags import Tag
-from ._common import to_brief_playlist
+from ._common import confirm_or_raise, to_brief_playlist
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
 
 
-def build_playlists_server(mass: MusicAssistant) -> FastMCP:
+def build_playlists_server(
+    mass: MusicAssistant, *, require_confirmation: bool = True
+) -> FastMCP:
     """Construct the ``playlists/*`` sub-server."""
     sub: FastMCP = FastMCP(name="playlists")
 
@@ -93,8 +95,14 @@ def build_playlists_server(mass: MusicAssistant) -> FastMCP:
     async def remove_tracks(
         playlist_id: str | int,
         positions: list[int],
+        ctx: Context | None = None,
     ) -> None:
         """Remove tracks at the given zero-based positions from a playlist."""
+        await confirm_or_raise(
+            ctx,
+            f"Remove {len(positions)} track(s) from playlist {playlist_id!r}?",
+            enabled=require_confirmation,
+        )
         await mass.music.playlists.remove_playlist_tracks(playlist_id, positions)
 
     return sub

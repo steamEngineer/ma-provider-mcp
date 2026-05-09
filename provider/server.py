@@ -10,6 +10,7 @@ from .constants import (
     CONF_EXTRA_ALLOWED_ORIGINS,
     CONF_MOUNT_PATH,
     CONF_REQUIRE_AUTH,
+    CONF_REQUIRE_CONFIRMATION,
     DEFAULT_MOUNT_PATH,
 )
 from .tags import enabled_tags
@@ -111,13 +112,25 @@ class MCPServerRuntime:
             auth=verifier,
         )
 
+        require_confirmation = bool(
+            self._config.get_value(CONF_REQUIRE_CONFIRMATION) or False
+        )
         mcp.mount(build_library_server(self._mass), namespace="library")
-        mcp.mount(build_queue_server(self._mass), namespace="queue")
+        mcp.mount(
+            build_queue_server(self._mass, require_confirmation=require_confirmation),
+            namespace="queue",
+        )
         mcp.mount(build_playback_server(self._mass), namespace="playback")
         mcp.mount(build_players_server(self._mass), namespace="players")
-        mcp.mount(build_playlists_server(self._mass), namespace="playlists")
+        mcp.mount(
+            build_playlists_server(self._mass, require_confirmation=require_confirmation),
+            namespace="playlists",
+        )
         mcp.mount(build_volume_server(self._mass), namespace="volume")
-        mcp.mount(build_media_server(self._mass), namespace="media")
+        mcp.mount(
+            build_media_server(self._mass, require_confirmation=require_confirmation),
+            namespace="media",
+        )
         mcp.mount(build_metadata_server(self._mass), namespace="metadata")
 
         register_resources(mcp, self._mass, self._config)

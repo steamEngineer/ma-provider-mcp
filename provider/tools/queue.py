@@ -4,18 +4,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from ..models import QueueBrief
 from ..tags import Tag
-from ._common import to_brief_queue
+from ._common import confirm_or_raise, to_brief_queue
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
 
 
-def build_queue_server(mass: MusicAssistant) -> FastMCP:
+def build_queue_server(
+    mass: MusicAssistant, *, require_confirmation: bool = True
+) -> FastMCP:
     """Construct the ``queue/*`` sub-server."""
     sub: FastMCP = FastMCP(name="queue")
 
@@ -64,12 +66,17 @@ def build_queue_server(mass: MusicAssistant) -> FastMCP:
             openWorldHint=False,
         ),
     )
-    async def clear_queue(queue_id: str) -> None:
+    async def clear_queue(queue_id: str, ctx: Context | None = None) -> None:
         """Clear all items from the given queue.
 
         Implementation note: MA's ``player_queues`` exposes a ``clear`` method;
         if the API name diverges, this is the single integration point to fix.
         """
+        await confirm_or_raise(
+            ctx,
+            f"Clear all items from queue {queue_id!r}? This cannot be undone.",
+            enabled=require_confirmation,
+        )
         clear = getattr(mass.player_queues, "clear", None)
         if clear is None:
             msg = "mass.player_queues.clear is not available on this MA build"

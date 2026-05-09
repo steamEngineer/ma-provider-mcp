@@ -116,6 +116,7 @@ def mock_config() -> MagicMock:
         "mount_path": "/mcp/v1",
         "extra_allowed_origins": "",
         "enforce_audience": False,
+        "require_confirmation": True,
         "query_library": True,
         "query_queue": True,
         "query_players": True,

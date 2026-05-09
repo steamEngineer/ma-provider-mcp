@@ -4,16 +4,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from ..tags import Tag
+from ._common import confirm_or_raise
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
 
 
-def build_media_server(mass: MusicAssistant) -> FastMCP:
+def build_media_server(
+    mass: MusicAssistant, *, require_confirmation: bool = True
+) -> FastMCP:
     """Construct the ``media/*`` sub-server."""
     sub: FastMCP = FastMCP(name="media")
 
@@ -41,8 +44,13 @@ def build_media_server(mass: MusicAssistant) -> FastMCP:
             openWorldHint=False,
         ),
     )
-    async def remove_from_favorites(uri: str) -> None:
+    async def remove_from_favorites(uri: str, ctx: Context | None = None) -> None:
         """Remove a media item (by URI) from favorites."""
+        await confirm_or_raise(
+            ctx,
+            f"Remove {uri!r} from favorites?",
+            enabled=require_confirmation,
+        )
         await mass.music.remove_item_from_favorites(uri)
 
     @sub.tool(
@@ -69,8 +77,13 @@ def build_media_server(mass: MusicAssistant) -> FastMCP:
             openWorldHint=False,
         ),
     )
-    async def remove_from_library(uri: str) -> None:
+    async def remove_from_library(uri: str, ctx: Context | None = None) -> None:
         """Remove a media item (by URI) from the library."""
+        await confirm_or_raise(
+            ctx,
+            f"Remove {uri!r} from the library? This cannot be undone.",
+            enabled=require_confirmation,
+        )
         await mass.music.remove_item_from_library(uri)
 
     @sub.tool(

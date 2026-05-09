@@ -28,6 +28,7 @@ from .constants import (
     CONF_QUERY_PLAYERS,
     CONF_QUERY_QUEUE,
     CONF_REQUIRE_AUTH,
+    CONF_REQUIRE_CONFIRMATION,
     CONF_RES_LIBRARY,
     CONF_RES_PLAYER,
     CONF_RES_PROMPTS,
@@ -98,6 +99,20 @@ def build_config_entries(
             description=(
                 "HTTP path prefix where the MCP server is mounted on MA's webserver. "
                 "Change only if it conflicts with another route."
+            ),
+            required=False,
+        ),
+        ConfigEntry(
+            key=CONF_REQUIRE_CONFIRMATION,
+            type=ConfigEntryType.BOOLEAN,
+            label="Confirm destructive operations",
+            default_value=True,
+            category="Server",
+            description=(
+                "Ask the MCP client to confirm before running destructive tools "
+                "(clear_queue, remove_tracks, remove_from_library, "
+                "remove_from_favorites). If the client doesn't support "
+                "elicitation, the call falls through to the permission flag."
             ),
             required=False,
         ),
