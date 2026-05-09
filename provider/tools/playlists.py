@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from ..models import PlaylistBrief
@@ -60,9 +60,25 @@ def build_playlists_server(mass: MusicAssistant) -> FastMCP:
             openWorldHint=False,
         ),
     )
-    async def add_tracks(playlist_id: str | int, track_uris: list[str]) -> None:
-        """Append multiple tracks to a playlist."""
-        await mass.music.playlists.add_playlist_tracks(playlist_id, track_uris)
+    async def add_tracks(
+        playlist_id: str | int,
+        track_uris: list[str],
+        ctx: Context | None = None,
+    ) -> None:
+        """Append multiple tracks to a playlist.
+
+        For batches up to 10 the call is bulk-dispatched (one round-trip);
+        beyond that, items are added one-by-one with progress reporting so
+        the LLM client can show a meaningful spinner / cancellation handle.
+        """
+        total = len(track_uris)
+        if total <= 10:
+            await mass.music.playlists.add_playlist_tracks(playlist_id, track_uris)
+            return
+        for i, uri in enumerate(track_uris, start=1):
+            await mass.music.playlists.add_playlist_track(playlist_id, uri)
+            if ctx is not None:
+                await ctx.report_progress(progress=i, total=total)
 
     @sub.tool(
         tags={Tag.DELETE_PLAYLISTS},

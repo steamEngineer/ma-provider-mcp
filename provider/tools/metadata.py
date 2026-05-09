@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from ..models import TrackBrief
@@ -40,8 +40,10 @@ def build_metadata_server(mass: MusicAssistant) -> FastMCP:
             openWorldHint=False,
         ),
     )
-    async def recommendations() -> list[dict[str, Any]]:
+    async def recommendations(ctx: Context | None = None) -> list[dict[str, Any]]:
         """Return Music Assistant's curated recommendations folders."""
+        if ctx is not None:
+            await ctx.info("Fetching MA curated recommendations…")
         folders = await mass.music.recommendations()
         result: list[dict[str, Any]] = []
         for folder in folders:

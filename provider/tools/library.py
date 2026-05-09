@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
 
 from ..models import (
@@ -53,10 +53,14 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
             openWorldHint=False,
         ),
     )
-    async def search_tracks(query: str, limit: int = 25) -> list[TrackBrief]:
+    async def search_tracks(
+        query: str, limit: int = 25, ctx: Context | None = None
+    ) -> list[TrackBrief]:
         """Search for tracks by free-text query across all enabled providers."""
         from music_assistant_models.enums import MediaType  # noqa: PLC0415
 
+        if ctx is not None:
+            await ctx.info(f"Searching MA for tracks matching {query!r} (limit={limit})")
         results = await mass.music.search(query, [MediaType.TRACK], limit=limit)
         return [to_brief_track(t) for t in (results.tracks or [])]
 
@@ -70,10 +74,14 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
             openWorldHint=False,
         ),
     )
-    async def search_albums(query: str, limit: int = 25) -> list[AlbumBrief]:
+    async def search_albums(
+        query: str, limit: int = 25, ctx: Context | None = None
+    ) -> list[AlbumBrief]:
         """Search for albums by free-text query."""
         from music_assistant_models.enums import MediaType  # noqa: PLC0415
 
+        if ctx is not None:
+            await ctx.info(f"Searching MA for albums matching {query!r} (limit={limit})")
         results = await mass.music.search(query, [MediaType.ALBUM], limit=limit)
         return [to_brief_album(a) for a in (results.albums or [])]
 
@@ -87,10 +95,14 @@ def build_library_server(mass: MusicAssistant) -> FastMCP:
             openWorldHint=False,
         ),
     )
-    async def search_artists(query: str, limit: int = 25) -> list[ArtistBrief]:
+    async def search_artists(
+        query: str, limit: int = 25, ctx: Context | None = None
+    ) -> list[ArtistBrief]:
         """Search for artists by free-text query."""
         from music_assistant_models.enums import MediaType  # noqa: PLC0415
 
+        if ctx is not None:
+            await ctx.info(f"Searching MA for artists matching {query!r} (limit={limit})")
         results = await mass.music.search(query, [MediaType.ARTIST], limit=limit)
         return [to_brief_artist(a) for a in (results.artists or [])]
 
