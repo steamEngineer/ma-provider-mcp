@@ -154,11 +154,17 @@ def to_brief_queue(queue: Any, items: Sequence[Any] | None = None) -> QueueBrief
                     artists=_names(getattr(getattr(it, "media_item", None), "artists", None)),
                 )
             )
-    # MA's PlayerQueue exposes total length via items_count or items_total in
-    # different builds; fall back to the count of brief items we already built.
-    explicit_count = _int(
-        getattr(queue, "items_count", None) or getattr(queue, "items_total", None)
-    )
+    # In the canonical MA model PlayerQueue.items is an int (total queue
+    # length), not a list. Fall back to alternate field names for older builds,
+    # and only as a last resort to len(brief_items) — which would under-report
+    # the real length, since `brief_items` is the truncated lookahead from
+    # get_active_queue, not the full queue.
+    raw_total = getattr(queue, "items", None)
+    explicit_count = _int(raw_total) if isinstance(raw_total, int) else None
+    if explicit_count is None:
+        explicit_count = _int(
+            getattr(queue, "items_count", None) or getattr(queue, "items_total", None)
+        )
     return QueueBrief(
         queue_id=str(getattr(queue, "queue_id", "")),
         current_index=_int(getattr(queue, "current_index", None)),

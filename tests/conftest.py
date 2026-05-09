@@ -40,6 +40,7 @@ class FakeWebserver:
         base_url: str = "http://localhost:8095",
         publish_ip: str = "127.0.0.1",
     ) -> None:
+        """Initialise an empty registry with the given advertised endpoints."""
         self.routes: list[tuple[str, Any, str]] = []
         self.base_url = base_url
         self.publish_ip = publish_ip
@@ -48,13 +49,13 @@ class FakeWebserver:
         self, path: str, handler: Any, method: str = "*"
     ) -> Any:
         """Mirror ``mass.webserver.register_dynamic_route``: store + return unregister."""
+        import contextlib  # noqa: PLC0415 - keep stdlib import inside method to mirror runtime
+
         self.routes.append((path, handler, method))
 
         def _unregister() -> None:
-            try:
+            with contextlib.suppress(ValueError):
                 self.routes.remove((path, handler, method))
-            except ValueError:
-                pass
 
         return _unregister
 

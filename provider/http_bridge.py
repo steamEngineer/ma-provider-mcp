@@ -43,7 +43,9 @@ def _normalize_origin(origin: str) -> str | None:
     """Return ``scheme://host[:port]`` lower-cased, default-port stripped, or None.
 
     Rejects forms without scheme or netloc; preserves ``"null"`` verbatim so it
-    can be matched against an explicit allowlist entry.
+    can be matched against an explicit allowlist entry. IPv6 hosts are
+    re-bracketed (``urlsplit`` strips the brackets via ``hostname``) so the
+    canonical form matches a literal ``http://[::1]`` allowlist entry.
     """
     if not origin:
         return None
@@ -54,10 +56,14 @@ def _normalize_origin(origin: str) -> str | None:
     host = parts.hostname
     if not scheme or not host:
         return None
+    host_lower = host.lower()
+    # urlsplit's `.hostname` returns the bare IPv6 ("::1"); we need brackets
+    # back ("[::1]") so f-string concatenation produces a valid Origin.
+    bracketed_host = f"[{host_lower}]" if ":" in host_lower else host_lower
     port = parts.port
     if port is None or port == _DEFAULT_PORTS.get(scheme):
-        return f"{scheme}://{host.lower()}"
-    return f"{scheme}://{host.lower()}:{port}"
+        return f"{scheme}://{bracketed_host}"
+    return f"{scheme}://{bracketed_host}:{port}"
 
 
 def _compute_origin_allowlist(
@@ -89,8 +95,11 @@ def _compute_origin_allowlist(
         # Derive port from base_url; fallback: no port (browsers send port if non-default).
         port = _port_from_base_url(base_url)
         suffix = f":{port}" if port else ""
-        allow.add(f"http://{publish_ip.lower()}{suffix}")
-        allow.add(f"https://{publish_ip.lower()}{suffix}")
+        ip_lower = publish_ip.lower()
+        # Bracket IPv6 literals so they match the way browsers serialize Origin.
+        ip_token = f"[{ip_lower}]" if ":" in ip_lower else ip_lower
+        allow.add(f"http://{ip_token}{suffix}")
+        allow.add(f"https://{ip_token}{suffix}")
 
     for raw in (extra_origins_csv or "").split(","):
         norm = _normalize_origin(raw.strip())

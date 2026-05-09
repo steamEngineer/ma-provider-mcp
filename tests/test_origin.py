@@ -31,11 +31,29 @@ from tests.conftest import FakeWebserver, build_aiohttp_app
         ("", None),
         ("not-a-url", None),
         ("http://", None),
+        # IPv6 literals: brackets must round-trip so the normalized form
+        # matches the allowlist entry the bridge synthesises.
+        ("http://[::1]", "http://[::1]"),
+        ("http://[::1]:8095", "http://[::1]:8095"),
+        ("HTTP://[::1]:8095", "http://[::1]:8095"),
+        ("http://[2001:db8::1]:80", "http://[2001:db8::1]"),
     ],
 )
 def test_normalize_origin(raw: str, expected: str | None) -> None:
     """Origin strings collapse to ``scheme://host[:port]`` lowercased, default ports stripped."""
     assert _normalize_origin(raw) == expected
+
+
+def test_compute_allowlist_ipv6_publish_ip() -> None:
+    """An IPv6 publish_ip is bracketed in the allowlist so browsers' Origin matches."""
+    mass = SimpleNamespace(
+        webserver=SimpleNamespace(base_url="http://localhost:8095", publish_ip="::1"),
+    )
+    allow = _compute_origin_allowlist(mass)
+    assert "http://[::1]:8095" in allow
+    assert _is_origin_allowed("http://[::1]:8095", allow) is True
+    # And without an explicit port (still works because we bracket consistently).
+    assert "http://[::1]" in allow
 
 
 def _fake_mass(base_url: str = "http://localhost:8095", publish_ip: str = "127.0.0.1"):

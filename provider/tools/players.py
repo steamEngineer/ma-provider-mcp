@@ -15,14 +15,6 @@ if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
 
 
-_READONLY = ToolAnnotations(
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
-)
-
-
 def build_players_server(mass: MusicAssistant) -> FastMCP:
     """Construct the ``players/*`` sub-server."""
     sub: FastMCP = FastMCP(name="players")
