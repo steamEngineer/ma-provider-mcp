@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-05-10
+
+### Fixed
+- **`isinstance` union syntax** in the JWT audience decoder used `str | list`
+  which raises `TypeError` on Python 3.9; replaced with `isinstance(aud, (str, list))`.
+- **`clear_queue` awaited a sync call** — `mass.player_queues.clear` is a
+  synchronous method in MA; removed the erroneous `await`.
+- **Permission hot-swap never triggered** — MA passes `changed_keys` with a
+  `values/` prefix (e.g. `values/control_playback`); the bare-key subset check
+  always failed, forcing a full runtime restart for every permission toggle.
+  Keys are now normalised before the check and `self.config` is updated in the
+  hot-swap branch.
+- **`mass.players.get(player_id)` unavailable** — MA's `PlayersController`
+  exposes `get_player()`, not `get()`. Fixed in both the tool and the resource
+  handler.
+- **Test helper `build_aiohttp_app` mapped wildcard routes to `GET` only** —
+  wizard `POST` handlers registered with `method="*"` were unreachable in
+  tests. The wildcard is now forwarded verbatim to aiohttp.
+
 ## [0.3.0] — 2026-05-10
 
 ### Added
