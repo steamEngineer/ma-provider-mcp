@@ -40,3 +40,9 @@ htmlcov/
 .ruff_cache/
 .ma-data/
 .playwright-mcp/
+
+# uv lockfile is environment-dependent; not committed
+uv.lock
+
+# Local debugging screenshots (Playwright dev runs)
+wizard-*.png
