@@ -407,7 +407,7 @@ HTML: str = """<!doctype html>
     if (signedIn) {
       $("wizard-panel").classList.remove("hidden");
       renderClients();
-      // Pre-select the first client so the snippet area is populated immediately.
+      // Preselect the first client so the snippet area is populated immediately.
       if (state.info.clients.length > 0) {
         selectClient(state.info.clients[0].id);
       }

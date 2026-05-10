@@ -58,28 +58,16 @@ async def handle_open_connect_action(
 
 
 def _signal_auth_session(mass: MusicAssistant, *, session_id: str, url: str) -> None:
-    """Wrap ``mass.signal_event(EventType.AUTH_SESSION, ...)`` with a soft fallback.
+    """Publish the wizard URL via MA's ``EventType.AUTH_SESSION`` signal.
 
-    Some MA versions / test stubs don't expose ``EventType.AUTH_SESSION``; in
-    that case we fall back to the literal string value MA's frontend listens
-    for. Never raises — failure to signal degrades gracefully (the user can
-    still open the wizard URL manually from MA logs).
+    The MA frontend subscribes to ``AUTH_SESSION`` events and ``window.open``-s
+    the carried URL — same mechanism the Spotify, Audible, QQMusic providers
+    use for OAuth redirect. Never raises: if the event bus rejects the call we
+    log and degrade gracefully (the wizard URL is still in the logs).
     """
-    event: Any
-    try:
-        from music_assistant_models.enums import EventType  # noqa: PLC0415
-
-        event = EventType.AUTH_SESSION
-    except (ImportError, AttributeError):
-        event = "auth_session"
+    from music_assistant_models.enums import EventType  # noqa: PLC0415
 
     try:
-        mass.signal_event(event, object_id=session_id, data=url)
-    except TypeError:
-        # Older positional signature: signal_event(event, object_id, data)
-        try:
-            mass.signal_event(event, session_id, url)
-        except Exception:
-            LOGGER.exception("Connect Wizard: signal_event failed")
+        mass.signal_event(EventType.AUTH_SESSION, object_id=session_id, data=url)
     except Exception:
         LOGGER.exception("Connect Wizard: signal_event failed")

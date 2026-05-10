@@ -63,15 +63,16 @@ async def _dispatch_open_connect(
     mount_path = str(values.get(CONF_MOUNT_PATH) or DEFAULT_MOUNT_PATH)
     base_url = str(getattr(mass.webserver, "base_url", "") or "")
 
-    current_user = None
-    auth = getattr(mass.webserver, "auth", None)
-    getter = getattr(auth, "get_current_user", None) if auth is not None else None
-    if callable(getter):
-        try:
-            current_user = getter()
-        except Exception:
-            LOGGER.debug("Connect Wizard: get_current_user raised", exc_info=True)
-            current_user = None
+    current_user: object | None = None
+    try:
+        from music_assistant.controllers.webserver.helpers.auth_middleware import (  # noqa: PLC0415
+            get_current_user,
+        )
+
+        current_user = get_current_user()
+    except Exception:
+        LOGGER.debug("Connect Wizard: get_current_user lookup failed", exc_info=True)
+        current_user = None
 
     try:
         await handle_open_connect_action(
