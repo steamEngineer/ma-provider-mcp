@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test helper `build_aiohttp_app` mapped wildcard routes to `GET` only** —
   wizard `POST` handlers registered with `method="*"` were unreachable in
   tests. The wildcard is now forwarded verbatim to aiohttp.
+- **MCP endpoint label showed hardcoded default path** — the info label in
+  provider settings always displayed `/mcp/v1` even when the user had
+  configured a custom `mount_path`. The label now reads the live config value.
 
 ## [0.3.0] — 2026-05-10
 
