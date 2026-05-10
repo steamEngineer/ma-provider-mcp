@@ -18,9 +18,9 @@ if TYPE_CHECKING:
 
 
 def test_total_entry_count(mock_mass: MagicMock) -> None:
-    """25 entries: 1 info label + 5 server settings + 16 permissions + 3 resources."""
+    """26 entries: 1 info label + 1 connect-wizard action + 5 server + 16 perms + 3 resources."""
     entries = build_config_entries(mock_mass, {})
-    assert len(entries) == 1 + 5 + 16 + 3
+    assert len(entries) == 1 + 1 + 5 + 16 + 3
 
 
 def test_all_permission_keys_present(mock_mass: MagicMock) -> None:

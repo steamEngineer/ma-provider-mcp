@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-05-10
+
+### Added
+- **Connect Wizard** — one-click `Open Connect Wizard` button in the
+  provider's settings opens a single-page UI that mints a per-client
+  long-lived token (`MCP — <Client>`) and renders ready-to-paste config
+  snippets for Claude Desktop, Claude Code, Cursor, Windsurf, VSCode,
+  ChatGPT (Connectors), Codex CLI, Gemini CLI, Cline, and Zed. Replaces
+  the manual `Settings → Security → Tokens` step entirely. Cursor users
+  get an extra **Add to Cursor** deeplink button. Falls back to a
+  username/password form when opened outside the settings panel (e.g.
+  bookmark, mobile browser).
+
 ## [0.2.4] — 2026-05-10
 
 ### Fixed

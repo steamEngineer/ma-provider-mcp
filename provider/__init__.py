@@ -12,7 +12,12 @@ no extra port, no changes to MA core.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
+
+__version__ = "0.3.0"
+
+LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from music_assistant_models.config_entries import (
@@ -29,13 +34,54 @@ if TYPE_CHECKING:
 async def get_config_entries(
     mass: MusicAssistant,
     instance_id: str | None = None,  # noqa: ARG001
-    action: str | None = None,  # noqa: ARG001
+    action: str | None = None,
     values: dict[str, ConfigValueType] | None = None,
 ) -> tuple[ConfigEntry, ...]:
-    """Return Config entries to setup this provider."""
+    """Return Config entries to setup this provider.
+
+    When ``action == "open_connect"`` is dispatched, mint a bootstrap token
+    bound to the calling user (when available) and signal MA's frontend to
+    open the Connect Wizard URL — the entries themselves are returned
+    unchanged so the settings panel re-renders cleanly.
+    """
     from .config import build_config_entries  # noqa: PLC0415
 
+    if action == "open_connect":
+        await _dispatch_open_connect(mass, values or {})
+
     return build_config_entries(mass, values or {})
+
+
+async def _dispatch_open_connect(
+    mass: MusicAssistant,
+    values: dict[str, ConfigValueType],
+) -> None:
+    """Mint a wizard bootstrap and signal the wizard URL to the frontend."""
+    from .connect import handle_open_connect_action  # noqa: PLC0415
+    from .constants import CONF_MOUNT_PATH, DEFAULT_MOUNT_PATH  # noqa: PLC0415
+
+    mount_path = str(values.get(CONF_MOUNT_PATH) or DEFAULT_MOUNT_PATH)
+    base_url = str(getattr(mass.webserver, "base_url", "") or "")
+
+    current_user = None
+    auth = getattr(mass.webserver, "auth", None)
+    getter = getattr(auth, "get_current_user", None) if auth is not None else None
+    if callable(getter):
+        try:
+            current_user = getter()
+        except Exception:
+            LOGGER.debug("Connect Wizard: get_current_user raised", exc_info=True)
+            current_user = None
+
+    try:
+        await handle_open_connect_action(
+            mass,
+            current_user=current_user,
+            mount_path=mount_path,
+            base_url=base_url,
+        )
+    except Exception:
+        LOGGER.exception("Connect Wizard: open_connect action failed")
 
 
 async def setup(
