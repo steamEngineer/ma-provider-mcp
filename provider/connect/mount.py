@@ -10,7 +10,7 @@ from __future__ import annotations
 import contextlib
 from typing import TYPE_CHECKING
 
-from provider.http_bridge import _compute_origin_allowlist, _is_origin_allowed
+from ..http_bridge import _compute_origin_allowlist, _is_origin_allowed
 
 from .handlers import (
     WizardContext,
