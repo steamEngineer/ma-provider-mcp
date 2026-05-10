@@ -85,7 +85,9 @@ def _signal_auth_session(mass: MusicAssistant, *, session_id: str, url: str) -> 
     The MA frontend subscribes to ``AUTH_SESSION`` events and ``window.open``-s
     the carried URL — same mechanism the Spotify, Audible, QQMusic providers
     use for OAuth redirect. Never raises: if the event bus rejects the call we
-    log and degrade gracefully (the wizard URL is still in the logs).
+    log the exception and the failure path (the user can re-trigger the action
+    manually) — the URL itself is **not** logged because it carries the
+    short-lived bootstrap token in its query string.
     """
     from music_assistant_models.enums import EventType  # noqa: PLC0415
 

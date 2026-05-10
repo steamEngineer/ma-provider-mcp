@@ -73,7 +73,14 @@ def make_serve_page(_ctx: WizardContext) -> Callable[[web.Request], Any]:
             body=HTML.encode("utf-8"),
             content_type="text/html",
             charset="utf-8",
-            headers={"Cache-Control": "no-store"},
+            headers={
+                "Cache-Control": "no-store",
+                # The wizard mints long-lived MA tokens on user click. Refuse
+                # to be framed so a hostile page cannot UI-redress the user
+                # into pressing "Generate config" inside an invisible iframe.
+                "X-Frame-Options": "DENY",
+                "Content-Security-Policy": "frame-ancestors 'none'",
+            },
         )
 
     return handler

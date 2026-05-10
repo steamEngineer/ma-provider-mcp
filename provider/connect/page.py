@@ -120,17 +120,26 @@ HTML: str = """<!doctype html>
 
     <div id="snippet-area" class="hidden">
       <div class="hint" id="path-hint"></div>
-      <pre id="snippet" class="code">…</pre>
-      <div class="actions">
-        <button id="copy-btn">Copy</button>
-        <button id="download-btn" class="secondary">Download</button>
-        <button id="cursor-btn" class="secondary hidden">Add to Cursor</button>
-        <button id="share-btn" class="secondary">Share URL</button>
+      <div id="generate-area">
+        <button id="generate-btn">Generate config</button>
+        <div class="hint" style="margin-top:6px">
+          Mints a long-lived token labelled <code id="pending-token-name">MCP — …</code>.
+        </div>
       </div>
-      <div id="notes-area" class="hint"></div>
-      <div class="banner good" id="token-banner" style="margin-top:12px">
-        Token shown once. Visible in MA → Settings → Security → Tokens as
-        <code id="token-name">MCP — …</code>. Revoke there.
+      <div id="snippet-output" class="hidden">
+        <pre id="snippet" class="code">…</pre>
+        <div class="actions">
+          <button id="copy-btn">Copy</button>
+          <button id="download-btn" class="secondary">Download</button>
+          <button id="cursor-btn" class="secondary hidden">Add to Cursor</button>
+          <button id="share-btn" class="secondary">Share wizard URL</button>
+          <button id="regen-btn" class="secondary">Re-generate</button>
+        </div>
+        <div id="notes-area" class="hint"></div>
+        <div class="banner good" id="token-banner" style="margin-top:12px">
+          Token shown once. Visible in MA → Settings → Security → Tokens as
+          <code id="token-name">MCP — …</code>. Revoke there.
+        </div>
       </div>
     </div>
   </section>
@@ -169,6 +178,9 @@ HTML: str = """<!doctype html>
     sessionToken: null,
     selectedClientId: null,
     urlMode: "loopback",   // or "advertised"
+    // Cache of minted tokens, keyed by client id, so toggling URL mode or
+    // re-clicking a tab does NOT mint a new token each time.
+    tokens: {},
     lastSnippet: "",
     lastFilename: "snippet.txt",
   };
@@ -234,10 +246,41 @@ HTML: str = """<!doctype html>
   function selectClient(id) {
     state.selectedClientId = id;
     renderClients();
-    generateForSelected();
+    renderSelected();
   }
 
-  async function generateForSelected() {
+  // Render the snippet area for the currently-selected client. Does NOT mint
+  // a new token: if a token already exists in cache it re-renders from cache
+  // (so URL-mode toggling and tab re-clicks are free); otherwise it shows a
+  // "Generate config" call-to-action.
+  function renderSelected() {
+    const c = findClient(state.selectedClientId);
+    if (!c) return;
+    const url = urlOf(state.urlMode);
+    $("snippet-area").classList.remove("hidden");
+    $("path-hint").textContent = c.config_path_hint || "";
+    $("notes-area").textContent = c.notes || "";
+    $("pending-token-name").textContent = "MCP — " + c.label;
+    $("token-name").textContent = "MCP — " + c.label;
+    $("url-display").textContent = url;
+    const cachedToken = state.tokens[c.id];
+    if (cachedToken) {
+      const rendered = c.template.split("{{URL}}").join(url).split("{{TOKEN}}").join(cachedToken);
+      state.lastSnippet = rendered;
+      state.lastFilename = c.filename || (c.id + ".txt");
+      $("snippet").textContent = rendered;
+      $("snippet-output").classList.remove("hidden");
+      $("generate-area").classList.add("hidden");
+      $("cursor-btn").classList.toggle("hidden", c.id !== "cursor");
+    } else {
+      $("snippet-output").classList.add("hidden");
+      $("generate-area").classList.remove("hidden");
+    }
+  }
+
+  // Mint a per-client long-lived token — only ever called from the explicit
+  // "Generate config" / "Re-generate" button click handlers.
+  async function mintForSelected() {
     const c = findClient(state.selectedClientId);
     if (!c) return;
     if (!state.sessionToken) {
@@ -263,17 +306,9 @@ HTML: str = """<!doctype html>
       showMsg((data && data.error) || ("HTTP " + res.status), "bad");
       return;
     }
-    const url = urlOf(state.urlMode);
-    const rendered = c.template.split("{{URL}}").join(url).split("{{TOKEN}}").join(data.token);
-    state.lastSnippet = rendered;
-    state.lastFilename = c.filename || (c.id + ".txt");
-    $("snippet").textContent = rendered;
-    $("path-hint").textContent = c.config_path_hint || "";
-    $("notes-area").textContent = c.notes || "";
-    $("token-name").textContent = "MCP — " + c.label;
-    $("snippet-area").classList.remove("hidden");
-    $("cursor-btn").classList.toggle("hidden", c.id !== "cursor");
-    $("url-display").textContent = url;
+    state.tokens[c.id] = data.token;
+    renderSelected();
+    showMsg("Generated token for " + c.label + ".", "good");
   }
 
   function copyText(text) {
@@ -307,8 +342,19 @@ HTML: str = """<!doctype html>
         state.urlMode = b.dataset.which;
         $("url-toggle").querySelectorAll("button").forEach((x) =>
           x.classList.toggle("active", x.dataset.which === state.urlMode));
-        if (state.selectedClientId) generateForSelected();
+        // Re-render only — never mint another token just because the user
+        // toggled the URL form. Snippet picks up the new URL from cache.
+        if (state.selectedClientId) renderSelected();
       });
+    });
+
+    $("generate-btn").addEventListener("click", mintForSelected);
+    $("regen-btn").addEventListener("click", () => {
+      // Drop the cached token so the next mint replaces it; the previous
+      // token remains valid in MA until the user revokes it from
+      // Settings → Security → Tokens.
+      if (state.selectedClientId) delete state.tokens[state.selectedClientId];
+      mintForSelected();
     });
 
     $("copy-btn").addEventListener("click", () => {
@@ -331,9 +377,11 @@ HTML: str = """<!doctype html>
     });
 
     $("share-btn").addEventListener("click", () => {
-      const txt = state.lastSnippet;
-      copyText(txt).then(() => showMsg(
-        "Snippet copied — paste into your AI client config.", "good"));
+      // Copy a clean wizard URL (no bootstrap query) so the user can open it
+      // on a different device — useful for mobile QR-less hand-off.
+      const wizardUrl = window.location.origin + window.location.pathname;
+      copyText(wizardUrl).then(() => showMsg(
+        "Wizard URL copied — open it on another device to generate configs there.", "good"));
     });
 
     $("login-form").addEventListener("submit", async (ev) => {
@@ -407,7 +455,9 @@ HTML: str = """<!doctype html>
     if (signedIn) {
       $("wizard-panel").classList.remove("hidden");
       renderClients();
-      // Preselect the first client so the snippet area is populated immediately.
+      // Preselect the first client so the user sees the path hint and the
+      // "Generate config" CTA — but do NOT mint a token automatically; that
+      // only happens on an explicit click.
       if (state.info.clients.length > 0) {
         selectClient(state.info.clients[0].id);
       }
