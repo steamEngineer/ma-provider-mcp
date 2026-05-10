@@ -56,12 +56,19 @@ async def _dispatch_open_connect(
     mass: MusicAssistant,
     values: dict[str, ConfigValueType],
 ) -> None:
-    """Mint a wizard bootstrap and signal the wizard URL to the frontend."""
+    """Mint a wizard bootstrap and signal the wizard URL to the frontend.
+
+    The MA frontend's ``EditProvider`` view subscribes to ``AUTH_SESSION``
+    events and ignores anything whose ``object_id`` does not match the
+    ``session_id`` it injected into ``values``. We must echo that same id
+    back as the event's ``object_id`` so the browser tab actually opens.
+    """
     from .connect import handle_open_connect_action  # noqa: PLC0415
     from .constants import CONF_MOUNT_PATH, DEFAULT_MOUNT_PATH  # noqa: PLC0415
 
     mount_path = str(values.get(CONF_MOUNT_PATH) or DEFAULT_MOUNT_PATH)
     base_url = str(getattr(mass.webserver, "base_url", "") or "")
+    session_id = str(values.get("session_id") or "")
 
     current_user: object | None = None
     try:
@@ -80,6 +87,7 @@ async def _dispatch_open_connect(
             current_user=current_user,
             mount_path=mount_path,
             base_url=base_url,
+            session_id=session_id or None,
         )
     except Exception:
         LOGGER.exception("Connect Wizard: open_connect action failed")

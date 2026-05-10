@@ -51,6 +51,8 @@ def test_categories_match_pr2889_ux(mock_mass: MagicMock) -> None:
     """Categories mirror upstream PR #2889 grouping for familiarity at review time."""
     entries = build_config_entries(mock_mass, {})
     categories = {getattr(e, "category", None) for e in entries if getattr(e, "category", None)}
+    # ``Generic`` comes from the Connect Wizard ACTION entry, which mirrors the
+    # Spotify provider's ``CONF_ACTION_AUTH`` button (no explicit category).
     assert categories == {
         "Server",
         "Query Permissions",
@@ -58,6 +60,7 @@ def test_categories_match_pr2889_ux(mock_mass: MagicMock) -> None:
         "Edit Permissions",
         "Delete Permissions",
         "MCP Resources",
+        "generic",
     }
 
 

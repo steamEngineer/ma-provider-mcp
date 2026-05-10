@@ -8,6 +8,7 @@ should ``window.open``).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
 from typing import TYPE_CHECKING, Any
@@ -25,6 +26,7 @@ async def handle_open_connect_action(
     current_user: Any,
     mount_path: str,
     base_url: str,
+    session_id: str | None = None,
 ) -> None:
     """Open the Connect Wizard in the user's browser via MA's auth-session signal.
 
@@ -34,6 +36,10 @@ async def handle_open_connect_action(
         is opened without a bootstrap token and falls back to its login form.
     :param mount_path: HTTP path prefix where the MCP server is mounted.
     :param base_url: Public base URL of MA (no trailing slash).
+    :param session_id: ``session_id`` echoed by the MA frontend in the action's
+        ``values``. Must be passed back verbatim as the ``AUTH_SESSION`` event
+        ``object_id`` so the EditProvider view actually opens the URL — frontend
+        ignores AUTH_SESSION events whose object_id does not match its session.
     """
     bootstrap: str | None = None
     if current_user is not None:
@@ -47,14 +53,30 @@ async def handle_open_connect_action(
             LOGGER.exception("Connect Wizard: failed to mint bootstrap token")
             bootstrap = None
 
-    base = base_url.rstrip("/")
+    # Path-only URL — the MA frontend assigns this to ``<a href>`` and the
+    # browser resolves it against the current location (the user's URL bar
+    # origin). Using ``base_url`` here would break in Docker / HA add-on
+    # deployments where MA reports an internal IP (e.g. ``http://172.21.0.2``)
+    # that the user's browser cannot reach.
+    del base_url  # kept in signature for backwards compatibility; ignored
     mount = "/" + mount_path.strip("/")
-    url = f"{base}{mount}/connect"
+    url = f"{mount}/connect"
     if bootstrap:
         url = f"{url}?{urlencode({'bootstrap': bootstrap})}"
 
-    session_id = f"mcp-connect-{secrets.token_urlsafe(8)}"
-    _signal_auth_session(mass, session_id=session_id, url=url)
+    object_id = session_id or f"mcp-connect-{secrets.token_urlsafe(8)}"
+    _signal_auth_session(mass, session_id=object_id, url=url)
+
+    # Hold the action response open briefly. MA frontend's EditProvider sets
+    # ``loading=true`` while awaiting our response (which keeps the overlay
+    # mounted) and, on receiving AUTH_SESSION, schedules a 100 ms setTimeout
+    # that grabs ``<a id="auth">`` from inside that overlay and clicks it.
+    # Without this delay the response races back first, ``loading`` flips to
+    # false, the overlay (and the anchor inside it) unmounts, and the
+    # frontend throws ``Cannot read properties of null (reading
+    # 'setAttribute')`` — the user sees nothing happen. 500 ms gives the
+    # frontend enough time to follow the link before we let the overlay close.
+    await asyncio.sleep(0.5)
 
 
 def _signal_auth_session(mass: MusicAssistant, *, session_id: str, url: str) -> None:

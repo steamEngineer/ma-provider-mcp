@@ -89,8 +89,6 @@ def build_config_entries(
                 "snippet for you."
             ),
             action="open_connect",
-            action_label="Open",
-            category="Server",
             required=False,
         ),
         ConfigEntry(

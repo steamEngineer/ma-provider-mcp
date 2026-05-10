@@ -329,7 +329,10 @@ async def test_action_handler_signals_url_with_bootstrap(
     args, kwargs = wizard_mass.signal_event.call_args
     url = kwargs.get("data") if "data" in kwargs else args[-1]
     assert isinstance(url, str)
-    assert url.startswith("http://localhost:8095/mcp/v1/connect")
+    # Path-only URL — the MA frontend resolves it against the user's location
+    # so the wizard works in Docker / HA add-on deployments where MA's
+    # advertised base_url points at an internal IP the browser cannot reach.
+    assert url.startswith("/mcp/v1/connect")
     assert "bootstrap=jwt-xyz" in url
 
 
