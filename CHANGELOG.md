@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] — 2026-05-10
+
+### Fixed
+- **`get_active_queue` fetched all 500 MA items then sliced in Python** — passes
+  `limit=include_items` directly to `mass.player_queues.items()` so MA only
+  materialises the requested number of queue entries.
+- **`queue://` resource had no item limit** — now explicitly passes `limit=500`
+  (MA's page size) and documents the cap in the docstring; removes stale
+  `hasattr` guards now that `player_queues.get` is confirmed present.
+- **`parse_resource_uri` silently parsed `player://foo/bar` as having a type
+  segment** — non-library schemes now raise `ValueError` on any `/` in the path,
+  preventing ambiguous parses and potential traversal confusion.
+- **`mount_path` not normalised at init** — values without a leading `/` (e.g.
+  `mcp/v1`) would produce broken routes; `MCPServerRuntime` now normalises with
+  `"/" + raw.strip("/")`.
+
+## [0.3.2] — 2026-05-10
+
 ## [0.3.1] — 2026-05-10
 
 ### Fixed
