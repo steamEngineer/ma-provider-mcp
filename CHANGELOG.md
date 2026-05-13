@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.15] — 2026-05-13
+
+### Changed
+- **Re-generating a per-client token in the Connect Wizard now revokes
+  the previous token automatically.** Previously the old long-lived
+  token remained valid for 10 years and could only be removed manually
+  from Profile → Long-lived access tokens. The wizard now deletes any
+  prior rows with the same client name for the same user before
+  minting; the frontend also tracks the new `token_id` in
+  `sessionStorage` and passes it back on the next re-generate as a
+  fast-path hint. Note: the same client label on two devices against
+  one MA shares a name, so re-generating on one device revokes the
+  other — revoke manually if you need independent tokens.
+
+### Fixed
+- **Stale `MCP — wizard bootstrap` / `MCP — wizard session` rows
+  accumulating in the user's token list.** Every wizard open + every
+  page load was adding ephemeral rows that lingered 30 days. Opening
+  the Connect Wizard now garbage-collects any prior wizard
+  bootstrap/session rows for the same user before minting the new
+  one. Per-client tokens (`MCP — <Client>`) are not touched.
+- **Connect Wizard snippets for Codex CLI, Cline, and Zed corrected
+  against upstream syntax drift.** Codex CLI's streamable-HTTP
+  transport reads custom headers from `http_headers` (not `headers`);
+  Cline's JSON schema does not define a `transportType` field (it's a
+  UI-only picker); Zed has had native remote-MCP support for a while,
+  so the `npx mcp-remote` stdio bridge is no longer needed. Users
+  pasting any of these snippets will now get a working server entry
+  without silent failures.
+
+### Security
+- **Connect Wizard bootstrap tokens are now single-use on a
+  best-effort basis.** Previously a bootstrap (the token embedded in
+  the wizard URL) could be exchanged for session tokens repeatedly
+  for up to 30 days. `/connect/exchange` now deletes the bootstrap
+  immediately after authenticating it and before minting the session,
+  so each bootstrap exchanges at most once under normal operation.
+  Revocation is best-effort: if the delete fails (DB error etc.) it
+  is logged and the mint still proceeds, matching the pre-patch
+  reusable behaviour only in that failure case.
+- **Connect Wizard `/connect/token` revoke is scoped to the
+  authenticated user.** The optional `prev_token_id` hint from the
+  frontend is now verified against the session user before any delete
+  — a caller cannot name a token owned by a different user and have
+  it revoked. The server-side name-dedup path was already scoped via
+  the `user_id` filter on the row lookup.
+
+## [0.3.14] — 2026-05-13
+
+### Fixed
+- **Provider settings and Connect Wizard pointed users at the wrong path
+  for managing per-client tokens.** The info label, the **Open Connect
+  Wizard** action description, and the wizard's post-mint banner all said
+  *Settings → Security → Tokens*, but Music Assistant exposes the page as
+  *Profile → Long-lived access tokens*. The displayed path now matches the
+  UI, so users following the wizard can find and revoke their tokens
+  without hunting through the wrong menu. `README.md` references updated
+  to match.
+
 ## [0.3.13] — 2026-05-13
 
 ### Changed
