@@ -38,11 +38,11 @@ def _install_hass_client_stub() -> None:
     if "hass_client" in sys.modules:
         return
     pkg = types.ModuleType("hass_client")
-    pkg.__path__ = []  # type: ignore[attr-defined]
-    pkg.HomeAssistantClient = object  # type: ignore[attr-defined]
+    pkg.__path__ = []
+    pkg.HomeAssistantClient = object
 
     exc = types.ModuleType("hass_client.exceptions")
-    exc.BaseHassClientError = type("BaseHassClientError", (Exception,), {})  # type: ignore[attr-defined]
+    exc.BaseHassClientError = type("BaseHassClientError", (Exception,), {})
 
     utils = types.ModuleType("hass_client.utils")
     for name in ("base_url", "get_auth_url", "get_token", "get_websocket_url"):
