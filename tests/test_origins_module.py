@@ -36,11 +36,11 @@ def test_http_bridge_re_exports_legacy_names() -> None:
     """
     from provider import http_bridge  # noqa: PLC0415
 
-    assert http_bridge._compute_origin_allowlist is origins.compute_origin_allowlist  # type: ignore[attr-defined]
-    assert http_bridge._is_origin_allowed_for_request is origins.is_origin_allowed_for_request  # type: ignore[attr-defined]
-    assert http_bridge._normalize_origin is origins._normalize_origin  # type: ignore[attr-defined]
-    assert http_bridge._port_from_base_url is origins._port_from_base_url  # type: ignore[attr-defined]
-    assert http_bridge._is_origin_allowed is origins._is_origin_allowed  # type: ignore[attr-defined]
+    assert http_bridge._compute_origin_allowlist is origins.compute_origin_allowlist
+    assert http_bridge._is_origin_allowed_for_request is origins.is_origin_allowed_for_request
+    assert http_bridge._normalize_origin is origins._normalize_origin
+    assert http_bridge._port_from_base_url is origins._port_from_base_url
+    assert http_bridge._is_origin_allowed is origins._is_origin_allowed
 
 
 def test_compute_origin_allowlist_includes_loopback() -> None:
