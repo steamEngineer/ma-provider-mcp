@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.26] — 2026-05-27
+
+### Security
+- **Bearer-token audience is now verified BEFORE Music Assistant
+  is consulted.** Previously every request hit
+  ``authenticate_with_token`` first, which refreshed MA's
+  sliding-window expiry on the token even when the audience was
+  about to fail; an attacker holding a non-MCP MA token could keep
+  it alive indefinitely by polling the MCP endpoint. The audience
+  check now runs first, short-circuiting before MA is touched.
+- **Connect Wizard credential endpoints refuse plaintext-HTTP
+  requests from non-loopback hosts.** ``/connect/login``,
+  ``/connect/exchange`` and ``/connect/token`` all carry secrets
+  (admin password, bootstrap, session token); over plain HTTP from
+  a LAN host they were sniffable. HTTPS and loopback are still
+  accepted; everything else returns a JSON 400 with an actionable
+  message.
+- **``play_announcement`` validates the supplied URL scheme.**
+  The ``url`` parameter is user-controlled and previously flowed
+  to MA's player API as-is, so a prompt-injected
+  ``file:///etc/passwd``, ``data:`` URL, etc. would dutifully be
+  fetched by the audio backend. Non-``http(s)`` schemes now raise
+  ``ToolError`` before reaching MA, and ``volume_level`` is
+  clamped to ``[0, 100]`` to match the rest of the volume surface.
+
+### Changed
+- **Dead ``try/except`` around the wizard's external-base-URL
+  detection removed.** ``getattr(mass.webserver, "clients", None)
+  or ()`` cannot raise, so the bare ``except Exception`` only
+  suppressed future real bugs without catching anything today.
+
 ## [0.3.25] — 2026-05-27
 
 ### Changed
