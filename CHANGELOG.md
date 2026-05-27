@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.24] — 2026-05-27
+
+### Security
+- **Connect Wizard bootstrap tokens no longer ride in the URL
+  query string.** Query strings end up in aiohttp's access log and
+  every reverse-proxy log on the path (HA ingress, nginx, …), and
+  could leak via ``Referer`` on outbound links before the wizard's
+  ``history.replaceState`` strip ran. The bootstrap now travels in
+  the URL fragment (``#bootstrap=…``), which is never sent to
+  servers or proxies and not included in cross-origin ``Referer``.
+
+### Changed
+- **Wizard HTML response now carries ``Referrer-Policy:
+  no-referrer`` and a stricter ``Content-Security-Policy``** —
+  ``default-src 'none'`` plus narrowly-scoped ``script-src``,
+  ``style-src``, ``connect-src`` and ``img-src`` directives. The
+  previous policy only restricted framing; the new one bars
+  exfiltration of cached long-lived MA tokens via fetch / img if a
+  future inline-data edit accidentally introduces XSS.
+
 ## [0.3.23] — 2026-05-27
 
 ### Fixed
