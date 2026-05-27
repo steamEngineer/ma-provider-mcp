@@ -13,7 +13,7 @@ a dep that is **not** installed in the bare provider venv used by CI's unit
 suite. We inject a minimal ``hass_client`` stub into ``sys.modules`` before
 the import so the test module is importable without the HA-add-on extras.
 """
-# mypy: disable-error-code="arg-type, no-untyped-def, type-arg, assignment, operator, misc, union-attr"
+# mypy: disable-error-code="arg-type, no-untyped-def, type-arg, assignment, operator, misc, union-attr, attr-defined"
 
 from __future__ import annotations
 
