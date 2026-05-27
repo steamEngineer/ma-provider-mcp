@@ -64,14 +64,14 @@ class TestPlayAnnouncementUrlGuard:
     async def test_accepts_http_and_https(
         self, server: FastMCP, mock_mass: Any, good_url: str
     ) -> None:
-        """http and https URLs are forwarded to MA verbatim."""
+        """Http and https URLs are forwarded to MA verbatim."""
         async with Client(server) as client:
             await client.call_tool(
                 "media_play_announcement",
                 {"player_id": "p1", "url": good_url},
             )
         mock_mass.players.play_announcement.assert_awaited_once()
-        args, kwargs = mock_mass.players.play_announcement.call_args
+        args = mock_mass.players.play_announcement.call_args.args
         assert args[0] == "p1"
         assert args[1] == good_url
 
