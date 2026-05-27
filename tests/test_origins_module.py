@@ -11,7 +11,7 @@ Two contracts are pinned here:
    underscore-prefixed names so existing call sites and any external tests
    keep working without churn.
 """
-# mypy: disable-error-code="arg-type, no-untyped-def, type-arg, assignment, misc"
+# mypy: disable-error-code="arg-type, no-untyped-def, type-arg, assignment, misc, attr-defined"
 
 from __future__ import annotations
 
