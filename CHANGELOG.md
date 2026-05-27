@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.22] — 2026-05-27
+
+### Changed
+- **`playlists/add_track`, `add_tracks` and `remove_tracks` now
+  accept both the integer library id and the
+  `library://playlist/<n>` URI for `playlist_id`** and normalise
+  internally to the integer form that Music Assistant requires.
+  Previously, passing the URI raised a Python `ValueError` deep
+  inside MA; passing an unsupported URI now raises a clean tool
+  error with guidance.
+
+### Fixed
+- **`playlists/add_tracks` no longer claims that batches of ten
+  or fewer tracks are added atomically.** The claim was incorrect
+  — Music Assistant performs no atomicity at any batch size — and
+  could mislead clients into believing rollback was available on
+  partial failure. The tool now always adds tracks one at a time
+  with progress reporting and an explicit "not atomic" notice.
+- **`playlists` tool docstrings no longer reference a
+  non-existent `PlaylistBrief.item_id` field.** Returned playlist
+  briefs expose `uri` only; pass that URI back to add/remove
+  tools as documented.
+
 ## [0.3.21] — 2026-05-27
 
 ### Changed
