@@ -33,7 +33,17 @@ def build_playlists_server(mass: MusicAssistant, *, require_confirmation: bool =
         timeout=TIMEOUT_MUTATION,
     )  # type: ignore[untyped-decorator, unused-ignore]
     async def create_playlist(name: str, provider_instance_id: str | None = None) -> PlaylistBrief:
-        """Create a new playlist on a music provider."""
+        """
+        Create a new empty playlist on a music provider.
+
+        Returns the new ``PlaylistBrief`` (use ``PlaylistBrief.uri`` /
+        ``.item_id`` to subsequently add tracks).
+
+        :param name: Display name for the playlist.
+        :param provider_instance_id: Music-provider instance to host the
+            playlist (e.g. ``spotify--<account>``); omit to let Music
+            Assistant pick the default writable provider.
+        """
         playlist = await mass.music.playlists.create_playlist(
             name, provider_instance_or_domain=provider_instance_id
         )
@@ -51,7 +61,18 @@ def build_playlists_server(mass: MusicAssistant, *, require_confirmation: bool =
         timeout=TIMEOUT_MUTATION,
     )  # type: ignore[untyped-decorator, unused-ignore]
     async def add_track(playlist_id: str | int, track_uri: str) -> None:
-        """Append one track to a playlist."""
+        """
+        Append one track to a playlist.
+
+        Use ``add_tracks`` for multiple tracks in a single call. Returns
+        nothing.
+
+        :param playlist_id: Playlist identifier — either the integer library
+            id (``PlaylistBrief.item_id``) or the provider-scoped URI
+            (``PlaylistBrief.uri``).
+        :param track_uri: Music Assistant URI of the track to append (e.g.
+            ``TrackBrief.uri``).
+        """
         await mass.music.playlists.add_playlist_track(playlist_id, track_uri)
 
     @sub.tool(
@@ -70,19 +91,20 @@ def build_playlists_server(mass: MusicAssistant, *, require_confirmation: bool =
         track_uris: list[str],
         ctx: Context | None = None,
     ) -> None:
-        """Append multiple tracks to a playlist.
+        """
+        Append multiple tracks to a playlist in one call. Returns nothing.
 
-        For batches up to 10 the call is bulk-dispatched (one round-trip);
-        beyond that, items are added one-by-one with progress reporting so
-        the LLM client can show a meaningful spinner / cancellation handle.
+        Batches of ten or fewer tracks are added atomically. Larger batches
+        are added one-by-one with progress reporting and **are not
+        atomic**: if the operation is cancelled or fails on the N-th track,
+        tracks ``0..N-1`` remain in the playlist with no rollback. Keep
+        batches at ten or fewer when atomic semantics matter.
 
-        .. warning::
-
-            The per-item path is **not transactional**. If the client cancels
-            (``notifications/cancelled``) or MA raises on the N-th track,
-            tracks 0..N-1 stay added — there is no rollback. Callers that need
-            atomic semantics should keep batches at ``<= 10`` so the bulk
-            ``add_playlist_tracks`` round-trip is used.
+        :param playlist_id: Playlist identifier — either the integer library
+            id (``PlaylistBrief.item_id``) or the provider-scoped URI
+            (``PlaylistBrief.uri``).
+        :param track_uris: List of Music Assistant track URIs to append, in
+            order.
         """
         total = len(track_uris)
         if total <= 10:
@@ -122,7 +144,20 @@ def build_playlists_server(mass: MusicAssistant, *, require_confirmation: bool =
         positions: list[int],
         ctx: Context | None = None,
     ) -> None:
-        """Remove tracks at the given zero-based positions from a playlist."""
+        """
+        Remove tracks from a playlist by zero-based position.
+
+        All requested positions are removed in a single call — pass them
+        together rather than one at a time, since removals shift the
+        positions of all later items. When ``Confirm destructive
+        operations`` is enabled the client is asked to confirm first.
+        Returns nothing.
+
+        :param playlist_id: Playlist identifier — either the integer library
+            id (``PlaylistBrief.item_id``) or the provider-scoped URI
+            (``PlaylistBrief.uri``).
+        :param positions: Zero-based positions of tracks to remove.
+        """
         await confirm_or_raise(
             ctx,
             f"Remove {len(positions)} track(s) from playlist {playlist_id!r}?",
