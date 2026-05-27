@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.29] — 2026-05-27
+
+### Fixed
+- **Connect Wizard rejected the Home-Assistant ingress flow with
+  ``Plaintext credential traffic from non-loopback hosts is not
+  allowed``.** The plaintext-credential guard introduced in
+  ``0.3.26`` waved through HTTPS and loopback but not HA ingress —
+  HA terminates TLS at its public front door and forwards the
+  request to Music Assistant over a *local* socket, so the wizard
+  sees ``request.scheme == "http"`` and a non-loopback
+  ``request.host`` even though the public hop is HTTPS. As a
+  result, opening the wizard via the ingress URL (e.g.
+  ``https://ha.example/api/hassio_ingress/<id>/mcp/v1/connect``)
+  fell through to the login form and rejected the user's
+  credentials on submit. The guard now mirrors the existing
+  ``Origin``-check pattern and trusts requests that MA's
+  ``is_request_from_ingress`` helper confirms are on the trusted
+  ingress socket — direct LAN plaintext requests are still
+  refused.
+
 ## [0.3.28] — 2026-05-27
 
 ### Changed
