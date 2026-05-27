@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.27] — 2026-05-27
+
+### Changed
+- **Origin-allowlist helpers split into a dedicated
+  ``provider/origins.py`` module**, with the previous
+  ``http_bridge`` symbols re-exported under their historical
+  names for back-compat. The Connect Wizard no longer reaches
+  into ``http_bridge`` via ``importlib`` to look up private
+  symbols — a rename of either helper would silently break the
+  wizard mount with an opaque ``RuntimeError`` if there were no
+  test to catch it. Two new contract tests pin both the public
+  module names and the back-compat aliases.
+- **External-base-URL detection prefers a public
+  ``client.authenticated_user`` attribute** when available,
+  falling back to the underscore-prefixed internal form Music
+  Assistant exposes today. A future MA rename to a public
+  property is then picked up transparently.
+
 ## [0.3.26] — 2026-05-27
 
 ### Security
