@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.28] — 2026-05-27
+
+### Changed
+- **Test suite quality + coverage backfill.** Six tests that
+  silently passed for the wrong reason are tightened — most
+  notably the ``test_context.py`` log-handler wiring (the
+  previous version no-op'd via a non-existent ``Client`` method),
+  the ``apply_permission_change`` hot-swap assertion (the preset
+  tag was also in defaults, so the test held whether the rebuild
+  ran or not), and the ``test_models.py`` ``to_brief_player``
+  powered-source check (now parametrized with a contradictory
+  case so a precedence swap is caught). Five new test files /
+  extensions add coverage for ``provider/prompts.py`` (was zero),
+  ``MCPServerProvider.update_config`` (was zero), every
+  malformed-JWT path in ``_extract_jwt_audience`` (now nine
+  parametrized cases), all five library resource kinds (was
+  artist-only) plus the ``queue_resource`` (was uncovered), and
+  an end-to-end hot-swap test that mounts a real FastMCP root
+  and verifies the visible tool surface flips on
+  ``apply_permission_change``. Test count: **296** (up from
+  **194** before the audit cycle).
+
 ## [0.3.27] — 2026-05-27
 
 ### Changed
