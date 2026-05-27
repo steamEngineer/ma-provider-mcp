@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.25] — 2026-05-27
+
+### Changed
+- **Media-tool errors are now more actionable.** ``_resolve_uri``
+  in the media tools surfaces a distinct ``ToolError`` per failure
+  class (``MediaNotFoundError`` / ``InvalidProviderURI`` /
+  ``ProviderUnavailableError``) instead of flattening every
+  failure to "Item not found"; the LLM caller can now distinguish
+  "URI typo" from "provider offline" and respond accordingly.
+- **``QueueBrief.item_count`` is now ``int | None``.** When the
+  upstream queue exposes no canonical total, the field is
+  ``None`` rather than ``0`` (silent zero on a non-empty queue
+  was worse than acknowledging the value is unknown).
+
+### Fixed
+- **Failed mount no longer leaves the runtime half-mounted.**
+  If ``MCPServerRuntime.start`` raises after a partial mount
+  (e.g. the well-known route registered but the main route
+  failed), the rollback path tears the in-progress state down
+  before re-raising so a retry starts from a clean slate.
+- **``get_track_by_uri`` and ``get_lyrics`` reject non-track
+  URIs with a clean ``ToolError``** instead of silently coercing
+  an album/playlist into a garbage ``TrackBrief`` (or returning
+  ``None`` for non-track lyrics queries).
+- **Connect Wizard login is shape-agnostic on the MA response.**
+  If Music Assistant migrates the ``auth.login`` return type to
+  a typed result object, the wizard surfaces the success/failure
+  correctly instead of silently reporting "invalid credentials"
+  for valid logins.
+
 ## [0.3.24] — 2026-05-27
 
 ### Security
