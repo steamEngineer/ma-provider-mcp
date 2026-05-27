@@ -16,7 +16,6 @@ from fastmcp import Client, FastMCP
 
 from provider.prompts import register_prompts
 
-
 _EXPECTED_NAMES = {"find_and_play", "curate_party_playlist", "now_playing_summary"}
 
 
@@ -30,7 +29,7 @@ def _config(*, prompts_enabled: bool) -> MagicMock:
 
 @pytest.fixture
 def mcp_with_prompts() -> FastMCP:
-    """A FastMCP root with all three prompts registered (gate ON)."""
+    """Build a FastMCP root with all three prompts registered (gate ON)."""
     mcp: FastMCP = FastMCP(name="t")
     register_prompts(mcp, _config(prompts_enabled=True))
     return mcp

@@ -26,9 +26,9 @@ from provider.middleware import TagFilterMiddleware
 from provider.server import MCPServerRuntime, build_tag_lookup
 
 
-def _build_runtime_with_mounted_server(mock_mass: MagicMock, mock_config: MagicMock) -> tuple[
-    MCPServerRuntime, FastMCP
-]:
+def _build_runtime_with_mounted_server(
+    mock_mass: MagicMock, mock_config: MagicMock
+) -> tuple[MCPServerRuntime, FastMCP]:
     """Construct a real ``MCPServerRuntime`` with a small FastMCP mounted.
 
     We skip the full ``start()`` (which would mount into MA's webserver) and
@@ -36,7 +36,7 @@ def _build_runtime_with_mounted_server(mock_mass: MagicMock, mock_config: MagicM
     minus the ASGI / route registration that has nothing to do with the
     hot-swap behaviour under test.
     """
-    from provider.tags import Tag, enabled_tags  # noqa: PLC0415
+    from provider.tags import enabled_tags  # noqa: PLC0415
     from provider.tools import build_library_server, build_volume_server  # noqa: PLC0415
 
     runtime = MCPServerRuntime(mock_mass, mock_config, logging.getLogger("t"))
@@ -50,9 +50,7 @@ def _build_runtime_with_mounted_server(mock_mass: MagicMock, mock_config: MagicM
     # would install — mutating ``runtime._allowed_tags`` after this point
     # should change the visible tool set on the next ``list_tools`` call.
     runtime._allowed_tags = {str(t) for t in enabled_tags(mock_config)}
-    mcp.add_middleware(
-        TagFilterMiddleware(lambda: runtime._allowed_tags, build_tag_lookup(mcp))
-    )
+    mcp.add_middleware(TagFilterMiddleware(lambda: runtime._allowed_tags, build_tag_lookup(mcp)))
     return runtime, mcp
 
 

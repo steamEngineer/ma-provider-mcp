@@ -24,6 +24,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+
 # Install the stub BEFORE the ``provider.provider`` import below. ``setdefault``
 # is intentional: if a future test environment has the real ``hass_client``
 # installed we want to use it.
@@ -163,7 +164,5 @@ async def test_values_prefix_stripped_off_every_key(
     )
 
     provider._runtime.apply_permission_change.assert_awaited_once()
-    _, kwargs = provider._runtime.apply_permission_change.call_args
-    args = provider._runtime.apply_permission_change.call_args.args
-    forwarded_keys = args[1]
+    forwarded_keys = provider._runtime.apply_permission_change.call_args.args[1]
     assert forwarded_keys == {"query_library", "edit_queue", "query_metadata"}
