@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.23] — 2026-05-27
+
+### Fixed
+- **Permission hot-swap could race the previous ASGI lifespan
+  shutdown.** The ``unmount`` returned from mounting the MCP
+  endpoint scheduled the FastMCP session-manager teardown as a
+  fire-and-forget background task and returned immediately, so a
+  follow-up ``apply_permission_change`` that needed a full restart
+  could start a new lifespan while the previous one was still
+  draining. Worst case the orphan task was garbage-collected before
+  it ran, leaking the session-manager task group and triggering
+  ``Task was destroyed but it is pending`` warnings. The unmount
+  now awaits the shutdown to completion before returning.
+
 ## [0.3.22] — 2026-05-27
 
 ### Changed
