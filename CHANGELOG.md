@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.22] — 2026-05-27
+
+### Changed
+- **`playlists/add_track`, `add_tracks` and `remove_tracks` now
+  accept both the integer library id and the
+  `library://playlist/<n>` URI for `playlist_id`** and normalise
+  internally to the integer form that Music Assistant requires.
+  Previously, passing the URI raised a Python `ValueError` deep
+  inside MA; passing an unsupported URI now raises a clean tool
+  error with guidance.
+
+### Fixed
+- **`playlists/add_tracks` no longer claims that batches of ten
+  or fewer tracks are added atomically.** The claim was incorrect
+  — Music Assistant performs no atomicity at any batch size — and
+  could mislead clients into believing rollback was available on
+  partial failure. The tool now always adds tracks one at a time
+  with progress reporting and an explicit "not atomic" notice.
+- **`playlists` tool docstrings no longer reference a
+  non-existent `PlaylistBrief.item_id` field.** Returned playlist
+  briefs expose `uri` only; pass that URI back to add/remove
+  tools as documented.
+
+## [0.3.21] — 2026-05-27
+
+### Changed
+- **Tool descriptions across all 45 tools are now Sphinx-style with
+  `:param:` blocks, sibling-tool disambiguation and return-shape
+  hints.** Every parameter previously surfaced to clients with an
+  empty description in the JSON Schema. The updated docstrings give
+  the LLM the constraints it needs to construct correct calls and
+  pick the right tool out of similar siblings (search vs. list,
+  favorites vs. library, play_media vs. play_index, volume_set vs.
+  volume_up/down vs. volume_mute, etc.).
+- **`play_media` is now flagged as a destructive operation** in its
+  tool annotations and timeouts to `30s` instead of `15s`. Loading
+  fresh media into a queue replaces whatever the queue was playing,
+  which is a destructive side effect from the caller's perspective;
+  hosts will prompt for confirmation accordingly. The longer
+  timeout matches `play_announcement`, where fetching audio from a
+  slow provider can exceed the default mutation timeout.
+- **`transfer_queue` is now flagged as a destructive operation**
+  for the same reason — the source player stops and its queue is
+  emptied.
+- **`play_announcement` timeout raised from `15s` to `30s`** —
+  fetching the announcement audio may take longer than the
+  mutation timeout allows on slow connections.
+
+### Fixed
+- **`search_tracks`, `search_albums`, `search_artists`,
+  `recently_added_tracks` and `recently_played` did not clamp
+  caller-supplied `limit` values,** while every sibling pagination
+  tool clamped via `page_args`. A sloppy or hostile client could
+  ask for an unbounded result set. All five now clamp to the
+  `[1, 200]` range that the rest of the library tools already
+  enforce.
+- **`previous_track`'s subtle restart-then-step-back behaviour is
+  now documented in the tool description** instead of being a
+  hidden semantic trap. Music Assistant restarts the current
+  track if it has been playing past the rewind threshold; the
+  caller has to invoke the tool a second time to actually move to
+  the previous item.
+
 ## [0.3.20] — 2026-05-26
 
 ### Changed
