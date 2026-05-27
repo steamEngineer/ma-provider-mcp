@@ -88,9 +88,7 @@ def _port_from_base_url(base_url: str) -> int | None:
     return None
 
 
-def compute_origin_allowlist(
-    mass: MusicAssistant, extra_origins_csv: str = ""
-) -> frozenset[str]:
+def compute_origin_allowlist(mass: MusicAssistant, extra_origins_csv: str = "") -> frozenset[str]:
     """Build the set of accepted ``Origin`` values for the MCP endpoint.
 
     See the module docstring for the full rule. The set is computed once at
