@@ -34,7 +34,7 @@ def test_http_bridge_re_exports_legacy_names() -> None:
     underscore-prefixed aliases so mypy treats them as private. This test
     is *exactly* the contract that asserts those aliases stay reachable.
     """
-    from provider import http_bridge
+    from provider import http_bridge  # noqa: PLC0415
 
     assert http_bridge._compute_origin_allowlist is origins.compute_origin_allowlist  # type: ignore[attr-defined]
     assert http_bridge._is_origin_allowed_for_request is origins.is_origin_allowed_for_request  # type: ignore[attr-defined]
@@ -67,11 +67,11 @@ def test_compute_origin_allowlist_adds_both_schemes_on_ma_port() -> None:
     mass.webserver.publish_ip = "192.168.1.42"
 
     allow = origins.compute_origin_allowlist(mass)
-    # Loopback × {http, https} × MA port
+    # Loopback x {http, https} x MA port
     for host in ("localhost", "127.0.0.1", "[::1]"):
         assert f"http://{host}:8095" in allow, host
         assert f"https://{host}:8095" in allow, host
-    # Configured publish_ip × {http, https} × MA port
+    # Configured publish_ip x {http, https} x MA port
     assert "http://192.168.1.42:8095" in allow
     assert "https://192.168.1.42:8095" in allow
     # base_url itself plus its https mirror
