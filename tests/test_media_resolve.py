@@ -94,14 +94,16 @@ class TestResolveUriNarrowsExceptions:
 
 def _fake_item(media_type: MediaType, **kwargs: Any) -> MagicMock:
     """Build a stub item exposing ``media_type`` and the usual brief fields."""
-    item = MagicMock(spec_set=["media_type", "uri", "name", "artists", "album", "duration", "metadata"])
+    item = MagicMock(
+        spec_set=["media_type", "uri", "name", "artists", "album", "duration", "metadata"]
+    )
     item.media_type = media_type
     item.uri = kwargs.get("uri", "library://track/1")
     item.name = kwargs.get("name", "Track Name")
     item.artists = kwargs.get("artists", [])
-    item.album = kwargs.get("album", None)
+    item.album = kwargs.get("album")
     item.duration = kwargs.get("duration", 180)
-    item.metadata = kwargs.get("metadata", None)
+    item.metadata = kwargs.get("metadata")
     return item
 
 
@@ -126,9 +128,7 @@ class TestGetTrackByUriRejectsNonTracks:
                     {"uri": f"library://{wrong_type.value}/42"},
                 )
 
-    async def test_accepts_track_media_type(
-        self, library_server: FastMCP, mock_mass: Any
-    ) -> None:
+    async def test_accepts_track_media_type(self, library_server: FastMCP, mock_mass: Any) -> None:
         """A genuine track URI returns the brief as before."""
         mock_mass.music.get_item_by_uri = AsyncMock(return_value=_fake_item(MediaType.TRACK))
         async with Client(library_server) as client:
@@ -143,9 +143,7 @@ class TestGetTrackByUriRejectsNonTracks:
 class TestGetLyricsRejectsNonTracks:
     """Lyrics are track-only; album/playlist URIs raise ``ToolError``."""
 
-    async def test_rejects_album_uri(
-        self, metadata_server: FastMCP, mock_mass: Any
-    ) -> None:
+    async def test_rejects_album_uri(self, metadata_server: FastMCP, mock_mass: Any) -> None:
         """An album URI raises rather than returning ``None`` silently."""
         mock_mass.music.get_item_by_uri = AsyncMock(
             return_value=_fake_item(MediaType.ALBUM, uri="library://album/7")
