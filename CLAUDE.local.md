@@ -25,6 +25,27 @@ Provider repo for the Music Assistant `mcp_server` plugin. Synced into the
   in tool responses to keep payloads small for LLM context.
 - Tool decorators always include `tags={Tag.…}` — never untagged.
 
+## AI assistants — commit attribution
+
+Per `CLAUDE.md` rule 5, add a `Co-Authored-By:` trailer to commits you create on
+the contributor's behalf. **Use the identity of the agent actually doing the work**
+— never copy an example from `CLAUDE.md`, `AGENTS.md`, or another tool's docs
+unless that example matches this session.
+
+| If the contributor uses… | Co-author trailer (high-level) |
+| --- | --- |
+| **Cursor** | Product name + Cursor's documented co-author address |
+| **Claude Code** (or other Anthropic Claude products) | `Claude` + **actual** model name + Anthropic noreply address |
+| **GitHub Copilot, OpenCode, or other assistants** | That product's documented attribution line |
+| **Any agent** | When unsure, check the tool's docs — do not guess or borrow another agent's line |
+
+**Do not** invent model strings or impersonate a product you are not running.
+Wrong attribution is worse than omitting a trailer.
+
+Some tools inject attribution automatically (e.g. Cursor **Settings → Agents →
+Attribution**). If the environment already adds a correct trailer, do not
+duplicate it with a second line from a different agent.
+
 ## Key external APIs
 
 - `mass.webserver.register_dynamic_route(path, handler, method="*") -> Callable[[], None]`
