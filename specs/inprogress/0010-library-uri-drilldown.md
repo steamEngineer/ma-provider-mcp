@@ -49,9 +49,8 @@ messages for not-found, malformed, and offline-provider cases.
 **Example flow only** — one way an agent might walk the library when it starts
 with only a name. Each step is independent: depending on prior context the agent
 may skip search, call only ``library_get_artist_albums`` when it already holds
-an ``artist_uri``, or call ``library_get_album_tracks`` directly when it already
-holds an ``album_uri`` (from search, playback state, queue rows, or a prior
-``AlbumBrief``).
+a URI, or call ``library_get_album_tracks`` directly when it already holds one
+(from search, playback state, queue rows, or a prior ``AlbumBrief``).
 
 ```mermaid
 sequenceDiagram
@@ -61,27 +60,27 @@ sequenceDiagram
     participant Common as shared URI resolver
     participant MA as Music Assistant
 
-    Note over Agent,MA: Optional — skip if artist_uri already known
+    Note over Agent,MA: Optional — skip if artist URI already known
     Agent->>Library: library_search_artists(query)
     Library->>MA: music.search
     MA-->>Library: matching artists
     Library-->>Agent: ArtistBrief[] (each with uri)
 
-    Note over Agent,MA: Optional step 1 — skip if album_uri already known
-    Agent->>Library: library_get_artist_albums(artist_uri)
+    Note over Agent,MA: Optional step 1 — skip if album URI already known
+    Agent->>Library: library_get_artist_albums(uri)
     Library->>Common: resolve_typed_uri (ARTIST)
-    Common->>MA: get_item_by_uri(artist_uri)
+    Common->>MA: get_item_by_uri(uri)
     MA-->>Common: Artist item
     Common->>MA: artists.albums(id, provider)
     MA-->>Common: Album rows
     Common-->>Library: ArtistAlbumsResult
     Library-->>Agent: artist + AlbumBrief[] (sorted year desc, name)
 
-    Note over Agent,MA: Step 2 — or call this alone with a known album_uri
-    Agent->>Library: library_get_album_tracks(album_uri)
-    Note right of Agent: album_uri from step 1, search,<br/>playback, queue, etc.
+    Note over Agent,MA: Step 2 — or call this alone with a known album URI
+    Agent->>Library: library_get_album_tracks(uri)
+    Note right of Agent: uri from step 1, search,<br/>playback, queue, etc.
     Library->>Common: resolve_typed_uri (ALBUM)
-    Common->>MA: get_item_by_uri(album_uri)
+    Common->>MA: get_item_by_uri(uri)
     MA-->>Common: Album item
     Common->>MA: albums.tracks(id, provider)
     MA-->>Common: Track rows
