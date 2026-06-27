@@ -136,6 +136,7 @@ class AddToQueueResult:
     uri: str
     name: str
     option: str
+    index: int | None = None
 
 
 @dataclass

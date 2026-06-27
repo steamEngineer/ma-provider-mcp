@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from music_assistant_models.enums import QueueOption, RepeatMode
+from music_assistant_models.errors import InvalidDataError, MusicAssistantError
+from music_assistant_models.queue_item import QueueItem
 
 from ..models import AddToQueueResult, QueueBrief
 from ..tags import Tag
@@ -23,6 +25,8 @@ from ._common import (
 )
 
 if TYPE_CHECKING:
+    from music_assistant_models.media_items import PlayableMediaItemType
+
     from music_assistant.mass import MusicAssistant
 
 # Matches MA's default queue page size (and the ``queue://`` resource cap).
@@ -42,7 +46,22 @@ def _queue_items_window_offset(queue: object | None, queue_option: QueueOption) 
     return max(0, current_index)
 
 
-def build_queue_server(
+def _min_insert_index(queue: object) -> int:
+    """Return the first queue index where new rows may be inserted."""
+    floor = getattr(queue, "current_index", None)
+    floor_val = floor if floor is not None else -1
+    buf = getattr(queue, "index_in_buffer", None)
+    if buf is not None:
+        floor_val = max(floor_val, buf)
+    return floor_val + 1
+
+
+def _items_window_offset_for_index(index: int) -> int:
+    """Return the ``items()`` offset that centers a window on ``index``."""
+    return max(0, index - MAX_QUEUE_ITEMS // 2)
+
+
+def build_queue_server(  # noqa: PLR0915 -- one sub-server registers all queue tools
     mass: MusicAssistant,
     *,
     require_confirmation: bool = True,
@@ -215,23 +234,32 @@ def build_queue_server(
         queue_id: str,
         uri: str,
         option: str = "add",
+        index: int | None = None,
     ) -> AddToQueueResult:
         """
         Enqueue media on a queue with an explicit placement mode.
 
         Supports different enqueue modes to control where items are placed
-        and whether playback is affected.
+        and whether playback is affected. When ``index`` is provided it
+        overrides ``option`` placement and inserts at that absolute 0-based
+        queue position without interrupting playback.
+
+        Call ``get_active_queue(include_items=…)`` first to inspect row order
+        and ``current_index`` when choosing ``index``. For play-next placement
+        only, ``option=next`` is simpler than computing an index.
 
         Returns ``AddToQueueResult`` with the new row's ``item_id``, ``uri``,
         ``name``, and ``option`` so callers can confirm the add succeeded
-        before enqueueing the next item.
+        before enqueueing the next item. When ``index`` was used, ``index``
+        in the result echoes the insertion position.
 
         :param queue_id: Queue identifier from ``QueueBrief.queue_id`` (distinct
             from ``PlayerBrief.player_id``).
         :param uri: Music Assistant URI of the media to add, of the form
             ``<provider>://<media_type>/<id>`` (e.g. as found on
             ``TrackBrief.uri`` / ``AlbumBrief.uri`` / ``PlaylistBrief.uri``).
-        :param option: Enqueue mode controlling placement and playback:
+        :param option: Enqueue mode controlling placement and playback when
+            ``index`` is omitted:
 
             - ``add`` (default): Append to the end of the queue without
               interrupting the current item. Preferred for "add to queue"
@@ -241,7 +269,78 @@ def build_queue_server(
             - ``play``: Insert after current item and start playing immediately.
             - ``replace_next``: Replace all items after the current one.
             - ``replace``: Clear the queue and replace with the new media.
+        :param index: Optional 0-based absolute queue index. When set, overrides
+            ``option`` and inserts without starting playback. Must be at or after
+            the next insertable position (after the current and buffered rows).
+            Valid range is ``min_insert .. item_count`` inclusive.
         """
+        if index is not None:
+            queue = mass.player_queues.get(queue_id)
+            if queue is None:
+                raise ToolError(f"Queue {queue_id!r} not found.")
+            if option in ("replace", "replace_next"):
+                raise ToolError(
+                    "``replace`` and ``replace_next`` cannot be combined with ``index``."
+                )
+            min_insert = _min_insert_index(queue)
+            all_items = mass.player_queues.items(queue_id)
+            item_count = len(all_items)
+            if index < min_insert:
+                cur = getattr(queue, "current_index", None)
+                raise ToolError(
+                    f"Index {index} is before the next insertable position ({min_insert}). "
+                    f"Current playback index is {cur!r}; only up-next rows can be inserted."
+                )
+            if index > item_count:
+                raise ToolError(
+                    f"Index {index} is out of range for queue {queue_id!r} "
+                    f"(item_count={item_count}, valid range {min_insert}..{item_count})."
+                )
+            offset = _items_window_offset_for_index(index)
+            before_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
+            before_item_ids = frozenset(
+                str(getattr(it, "queue_item_id", "")) for it in before_items
+            )
+            try:
+                media_item = await mass.music.get_item_by_uri(uri)
+            except MusicAssistantError as err:
+                raise ToolError(str(err)) from err
+            try:
+                resolved = await mass.player_queues._resolve_media_items(
+                    media_item, queue_id=queue_id
+                )
+            except InvalidDataError as err:
+                raise ToolError(str(err)) from err
+            queue_items = [
+                QueueItem.from_media_item(queue_id, cast("PlayableMediaItemType", x))
+                for x in resolved
+                if x and getattr(x, "available", True)
+            ]
+            if not queue_items:
+                raise ToolError("No playable items found")
+            await mass.player_queues.load(
+                queue_id,
+                queue_items,
+                insert_at_index=index,
+                keep_remaining=True,
+                keep_played=True,
+                shuffle=False,
+            )
+            after_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
+            added = resolve_added_queue_item(after_items, uri, before_item_ids=before_item_ids)
+            if added is None:
+                raise ToolError(
+                    f"Added {uri!r} to queue {queue_id!r} at index {index} "
+                    "but could not locate the new queue row."
+                )
+            return AddToQueueResult(
+                item_id=str(getattr(added, "queue_item_id", "")),
+                uri=uri,
+                name=queue_item_display_name(added),
+                option=option,
+                index=index,
+            )
+
         # QueueOption._missing_ silently falls back to UNKNOWN for invalid values
         # instead of raising ValueError, so we must validate explicitly.
         queue_option = QueueOption(option)
