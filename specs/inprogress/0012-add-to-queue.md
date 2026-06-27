@@ -43,19 +43,31 @@ added row via id-diff with a tail window for long queues.
 - ``tests/test_add_to_queue.py`` — valid/invalid options, default, ack payload,
   id-diff for duplicates and album expansion, tail window, delete permission gate.
 - ``tests/test_annotations.py`` — ``queue_add_to_queue`` listed as destructive.
-- Manual: call ``queue_add_to_queue`` with a track URI and ``option=add`` while
-  playback is active; confirm current item keeps playing and the new row appears
-  at the queue tail.
+- Manual: call ``queue_add_to_queue`` with a track URI and ``option=next`` while
+  playback is active; confirm the current item keeps playing and the new row
+  appears immediately after it in the queue (play-next placement, not tail append).
 
 ## Sequence Diagram
 
 ```mermaid
 sequenceDiagram
-    Agent->>QueueTool: add_to_queue(queue_id, uri, option)
-    QueueTool->>QueueTool: validate QueueOption + delete permission
-    QueueTool->>MA: player_queues.items (before window)
-    QueueTool->>MA: player_queues.play_media
-    QueueTool->>MA: player_queues.items (after window)
-    QueueTool->>QueueTool: resolve_added_queue_item
-    QueueTool-->>Agent: AddToQueueResult
+    participant Agent
+    participant Queue as queue/* tools
+    participant MA as Music Assistant
+
+    Agent->>Queue: queue_add_to_queue(queue_id, uri, option)
+    Note over Queue: Reject unknown option; replace and replace_next require delete:queue
+    Queue->>MA: player_queues.get(queue_id)
+    MA-->>Queue: queue (items total, current_index)
+    Note over Queue: compute offset window from option + queue length
+    Queue->>MA: player_queues.items(limit, offset)
+    MA-->>Queue: before rows
+    Queue->>Queue: snapshot before_item_ids
+    Queue->>MA: player_queues.play_media(uri, option)
+    Note over MA: enqueue / replace per QueueOption
+    Queue->>MA: player_queues.items(limit, offset)
+    MA-->>Queue: after rows
+    Note over Queue: find new row by id-diff vs before_item_ids; URI fallback if ids indistinguishable
+    Queue->>Queue: resolve_added_queue_item
+    Queue-->>Agent: AddToQueueResult (item_id, uri, name, option)
 ```
