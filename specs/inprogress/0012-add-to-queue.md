@@ -55,7 +55,7 @@ sequenceDiagram
     participant Queue as queue/* tools
     participant MA as Music Assistant
 
-    Note over Queue: Reject unknown option; replace and replace_next require delete queue permission
+    Note over Queue: Reject unknown option. Replace and replace_next require delete queue permission
     Agent->>Queue: queue_add_to_queue(queue_id, uri, option)
     Queue->>MA: player_queues.get(queue_id)
     MA-->>Queue: queue (items total, current_index)
@@ -67,7 +67,7 @@ sequenceDiagram
     Note over MA: enqueue / replace per QueueOption
     Queue->>MA: player_queues.items(limit, offset)
     MA-->>Queue: after rows
-    Note over Queue: find new row by id-diff vs before_item_ids; URI fallback if ids indistinguishable
+    Note over Queue: find new row by id-diff vs before_item_ids. URI fallback if ids indistinguishable
     Queue->>Queue: resolve_added_queue_item
     Queue-->>Agent: AddToQueueResult (item_id, uri, name, option)
 ```
