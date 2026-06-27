@@ -55,7 +55,7 @@ sequenceDiagram
     participant Queue as queue/* tools
     participant MA as Music Assistant
 
-    Note over Queue: Reject unknown option; replace and replace_next require delete:queue
+    Note over Queue: Reject unknown option; replace and replace_next require delete queue permission
     Agent->>Queue: queue_add_to_queue(queue_id, uri, option)
     Queue->>MA: player_queues.get(queue_id)
     MA-->>Queue: queue (items total, current_index)
