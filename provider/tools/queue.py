@@ -8,11 +8,19 @@ from typing import TYPE_CHECKING
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
-from music_assistant_models.enums import RepeatMode
+from music_assistant_models.enums import QueueOption, RepeatMode
 
-from ..models import QueueBrief
+from ..models import AddToQueueResult, QueueBrief
 from ..tags import Tag
-from ._common import TIMEOUT_FAST, TIMEOUT_MUTATION, confirm_or_raise, to_brief_queue
+from ._common import (
+    TIMEOUT_FAST,
+    TIMEOUT_MUTATION,
+    TIMEOUT_QUERY,
+    confirm_or_raise,
+    queue_item_display_name,
+    resolve_added_queue_item,
+    to_brief_queue,
+)
 
 if TYPE_CHECKING:
     from music_assistant.mass import MusicAssistant
@@ -21,7 +29,25 @@ if TYPE_CHECKING:
 MAX_QUEUE_ITEMS = 500
 
 
-def build_queue_server(mass: MusicAssistant, *, require_confirmation: bool = True) -> FastMCP:
+def _queue_items_window_offset(queue: object | None, queue_option: QueueOption) -> int:
+    """Return the ``items()`` offset for locating newly added rows in long queues."""
+    if queue is None:
+        return 0
+    total = int(getattr(queue, "items", 0) or 0)
+    current_index = int(getattr(queue, "current_index", 0) or 0)
+    if queue_option is QueueOption.ADD:
+        return max(0, total - MAX_QUEUE_ITEMS)
+    if queue_option is QueueOption.REPLACE:
+        return 0
+    return max(0, current_index)
+
+
+def build_queue_server(
+    mass: MusicAssistant,
+    *,
+    require_confirmation: bool = True,
+    delete_queue_enabled: bool = True,
+) -> FastMCP:
     """Construct the ``queue/*`` sub-server."""
     sub: FastMCP = FastMCP(name="queue")
 
@@ -44,8 +70,8 @@ def build_queue_server(mass: MusicAssistant, *, require_confirmation: bool = Tru
         ``item_count``, shuffle / repeat flags, ``available`` and up to
         ``include_items`` lookahead ``items``. Note that
         ``QueueBrief.queue_id`` is the identifier the mutation tools
-        (``set_shuffle``, ``set_repeat``, ``clear_queue``, ``transfer_queue``)
-        expect — it is
+        (``set_shuffle``, ``set_repeat``, ``add_to_queue``, ``clear_queue``,
+        ``transfer_queue``) expect — it is
         distinct from ``player_id``. For a queue fed by an external plugin
         source (Connect / AirPlay / Ynison), the current item's ``name`` is
         the real track title rather than the source wrapper name.
@@ -173,5 +199,81 @@ def build_queue_server(mass: MusicAssistant, *, require_confirmation: bool = Tru
             receive the queue.
         """
         await mass.player_queues.transfer_queue(source_queue_id, target_queue_id)
+
+    @sub.tool(
+        tags={Tag.EDIT_QUEUE},
+        annotations=ToolAnnotations(
+            title="Add media to queue",
+            readOnlyHint=False,
+            destructiveHint=True,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+        timeout=TIMEOUT_QUERY,
+    )  # type: ignore[untyped-decorator, unused-ignore]
+    async def add_to_queue(
+        queue_id: str,
+        uri: str,
+        option: str = "add",
+    ) -> AddToQueueResult:
+        """
+        Enqueue media on a queue with an explicit placement mode.
+
+        Supports different enqueue modes to control where items are placed
+        and whether playback is affected.
+
+        Returns ``AddToQueueResult`` with the new row's ``item_id``, ``uri``,
+        ``name``, and ``option`` so callers can confirm the add succeeded
+        before enqueueing the next item.
+
+        :param queue_id: Queue identifier from ``QueueBrief.queue_id`` (distinct
+            from ``PlayerBrief.player_id``).
+        :param uri: Music Assistant URI of the media to add, of the form
+            ``<provider>://<media_type>/<id>`` (e.g. as found on
+            ``TrackBrief.uri`` / ``AlbumBrief.uri`` / ``PlaylistBrief.uri``).
+        :param option: Enqueue mode controlling placement and playback:
+
+            - ``add`` (default): Append to the end of the queue without
+              interrupting the current item. Preferred for "add to queue"
+              requests — unlike ``playback_play_media``, this keeps what is
+              already playing.
+            - ``next``: Insert after the currently playing item (plays next).
+            - ``play``: Insert after current item and start playing immediately.
+            - ``replace_next``: Replace all items after the current one.
+            - ``replace``: Clear the queue and replace with the new media.
+        """
+        # QueueOption._missing_ silently falls back to UNKNOWN for invalid values
+        # instead of raising ValueError, so we must validate explicitly.
+        queue_option = QueueOption(option)
+        if queue_option is QueueOption.UNKNOWN:
+            valid = ", ".join(f"``{e.value}``" for e in QueueOption if e is not QueueOption.UNKNOWN)
+            raise ToolError(f"Invalid option {option!r}. Valid options: {valid}")
+
+        if (
+            queue_option in {QueueOption.REPLACE, QueueOption.REPLACE_NEXT}
+            and not delete_queue_enabled
+        ):
+            raise ToolError(
+                "Option requires delete:queue permission "
+                "(``replace`` and ``replace_next`` clear queue items)."
+            )
+
+        queue = mass.player_queues.get(queue_id)
+        offset = _queue_items_window_offset(queue, queue_option)
+        before_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
+        before_item_ids = frozenset(str(getattr(it, "queue_item_id", "")) for it in before_items)
+        await mass.player_queues.play_media(queue_id, uri, option=queue_option)
+        after_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
+        added = resolve_added_queue_item(after_items, uri, before_item_ids=before_item_ids)
+        if added is None:
+            raise ToolError(
+                f"Added {uri!r} to queue {queue_id!r} but could not locate the new queue row."
+            )
+        return AddToQueueResult(
+            item_id=str(getattr(added, "queue_item_id", "")),
+            uri=uri,
+            name=queue_item_display_name(added),
+            option=option,
+        )
 
     return sub
