@@ -2,7 +2,7 @@
 id: "0011"
 title: "Adopt upstream Track A MCP control tools (pause/resume, ungroup, set_repeat)"
 size: M
-status: inprogress
+status: done
 priority: P1
 effort_minutes: 15
 feature_id:
