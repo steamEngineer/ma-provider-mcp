@@ -195,12 +195,13 @@ async def test_add_to_queue_replace_requires_delete_permission(
 
 
 def _mock_queue(
-    *, current_index: int | None = 0, index_in_buffer: int | None = None
+    *, current_index: int | None = 0, index_in_buffer: int | None = None, items: int = 0
 ) -> SimpleNamespace:
     return SimpleNamespace(
         queue_id="q1",
         current_index=current_index,
         index_in_buffer=index_in_buffer,
+        items=items,
     )
 
 
@@ -225,12 +226,15 @@ def _setup_index_add_mocks(
     after: list[SimpleNamespace],
     current_index: int = 1,
     index_in_buffer: int | None = None,
+    items_count: int | None = None,
 ) -> None:
     mock_mass.player_queues.get.return_value = _mock_queue(
         current_index=current_index,
         index_in_buffer=index_in_buffer,
+        items=items_count if items_count is not None else len(before),
     )
-    mock_mass.player_queues.items = MagicMock(side_effect=[before, before, after])
+    # Index path fetches the lookahead window before and after the load.
+    mock_mass.player_queues.items = MagicMock(side_effect=[before, after])
     mock_mass.music.get_item_by_uri = AsyncMock(return_value=_mock_track(uri=uri))
     mock_mass.player_queues._resolve_media_items = AsyncMock(return_value=[_mock_track(uri=uri)])
     mock_mass.player_queues.load = AsyncMock()
@@ -346,8 +350,8 @@ async def test_add_to_queue_index_expands_album(
         _queue_item(item_id="stunt-1", uri="library://track/206", name="One Week"),
         _queue_item(item_id="stunt-2", uri="library://track/207", name="It's All Been Done"),
     ]
-    mock_mass.player_queues.get.return_value = _mock_queue(current_index=0)
-    mock_mass.player_queues.items = MagicMock(side_effect=[before, before, after])
+    mock_mass.player_queues.get.return_value = _mock_queue(current_index=0, items=len(before))
+    mock_mass.player_queues.items = MagicMock(side_effect=[before, after])
     mock_mass.music.get_item_by_uri = AsyncMock(
         return_value=_mock_track(uri=album_uri, name="Stunt")
     )
@@ -362,3 +366,67 @@ async def test_add_to_queue_index_expands_album(
     assert len(queue_items) == 2
     assert result.data.item_id == "stunt-1"
     assert result.data.index == 1
+
+
+async def test_add_to_queue_add_tracks_growing_tail_window(
+    mounted_queue: FastMCP, mock_mass: MagicMock
+) -> None:
+    """option=add recomputes the tail window from the post-add total (regression: #1).
+
+    For a queue longer than MAX_QUEUE_ITEMS the appended row lands beyond the
+    pre-add window; the after-window offset must follow the new total or the
+    successful add is wrongly reported as 'could not locate the new row'.
+    """
+    uri = "spotify://track/1"
+    mock_mass.player_queues.get = MagicMock(
+        side_effect=[
+            SimpleNamespace(items=501, current_index=0, queue_id="q1"),
+            SimpleNamespace(items=502, current_index=0, queue_id="q1"),
+        ]
+    )
+    mock_mass.player_queues.items = MagicMock(
+        side_effect=[[], [_queue_item(item_id="tail-new", uri=uri, name="Tail Track")]]
+    )
+    async with Client(mounted_queue) as client:
+        result = await client.call_tool(
+            "queue_add_to_queue", {"queue_id": "q1", "uri": uri, "option": "add"}
+        )
+    assert result.data.item_id == "tail-new"
+    # before-window offset from total 501, after-window offset from total 502.
+    assert mock_mass.player_queues.items.call_args_list[0].kwargs["offset"] == 1
+    assert mock_mass.player_queues.items.call_args_list[1].kwargs["offset"] == 2
+
+
+async def test_add_to_queue_index_count_uses_queue_total_not_page(
+    mounted_queue: FastMCP, mock_mass: MagicMock
+) -> None:
+    """A valid index past the 500-row page cap is accepted (regression: #2).
+
+    item_count must come from the queue's own row count, not len() of a capped
+    items() page, or inserts beyond index 500 are wrongly rejected.
+    """
+    uri = "spotify://track/new"
+    before = [_queue_item(item_id="i0", uri="u0", name="n0")]
+    after = [*before, _queue_item(item_id="deep-row", uri=uri, name="Deep Track")]
+    _setup_index_add_mocks(
+        mock_mass, uri=uri, before=before, after=after, current_index=0, items_count=1000
+    )
+    async with Client(mounted_queue) as client:
+        result = await client.call_tool(
+            "queue_add_to_queue", {"queue_id": "q1", "uri": uri, "index": 600}
+        )
+    assert result.data.index == 600
+    assert result.data.item_id == "deep-row"
+
+
+async def test_add_to_queue_index_rejects_invalid_option(
+    mounted_queue: FastMCP, mock_mass: MagicMock
+) -> None:
+    """An invalid option is rejected even when index is set (regression: #3)."""
+    mock_mass.player_queues.get.return_value = _mock_queue(current_index=0, items=5)
+    async with Client(mounted_queue) as client:
+        with pytest.raises(ToolError, match="Invalid option"):
+            await client.call_tool(
+                "queue_add_to_queue",
+                {"queue_id": "q1", "uri": "spotify://track/1", "option": "bogus", "index": 2},
+            )

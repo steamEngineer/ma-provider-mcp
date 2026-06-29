@@ -521,25 +521,26 @@ def queue_item_display_name(item: Any) -> str:
 
 def resolve_added_queue_item(
     items: Sequence[Any],
-    uri: str,
     *,
+    uris: frozenset[str],
     before_item_ids: frozenset[str],
 ) -> Any | None:
     """
     Locate the queue row created by the most recent ``add_to_queue`` call.
 
     Prefers rows whose ``queue_item_id`` was not present before the add.
-    Falls back to the last row matching ``uri`` when ids cannot be
+    Falls back to the last row whose URI is in ``uris`` when ids cannot be
     distinguished (e.g. after ``replace``).
 
     :param items: queue items after the add.
-    :param uri: URI passed to ``add_to_queue``.
+    :param uris: candidate media URIs — the requested URI plus, for a container
+        add (album / playlist), the resolved per-track URIs.
     :param before_item_ids: ``queue_item_id`` values present before the add.
     """
     new_items = [it for it in items if str(getattr(it, "queue_item_id", "")) not in before_item_ids]
     if new_items:
         return new_items[0]
-    matches = [it for it in items if queue_item_uri(it) == uri]
+    matches = [it for it in items if queue_item_uri(it) in uris]
     if matches:
         return matches[-1]
     return None

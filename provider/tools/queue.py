@@ -61,7 +61,89 @@ def _items_window_offset_for_index(index: int) -> int:
     return max(0, index - MAX_QUEUE_ITEMS // 2)
 
 
-def build_queue_server(  # noqa: PLR0915 -- one sub-server registers all queue tools
+async def _add_to_queue_at_index(
+    mass: MusicAssistant,
+    queue_id: str,
+    uri: str,
+    option: str,
+    index: int,
+) -> AddToQueueResult:
+    """
+    Insert media at an absolute 0-based queue index without interrupting playback.
+
+    :param queue_id: Queue identifier from ``QueueBrief.queue_id``.
+    :param uri: Music Assistant URI of the media to insert.
+    :param option: Original placement option, echoed back in the result.
+    :param index: Absolute 0-based insertion position.
+    """
+    queue = mass.player_queues.get(queue_id)
+    if queue is None:
+        raise ToolError(f"Queue {queue_id!r} not found.")
+    min_insert = _min_insert_index(queue)
+    # The queue's own row count — items() pages are capped at MAX_QUEUE_ITEMS,
+    # so len() of a page would wrongly reject valid inserts past that cap.
+    item_count = int(getattr(queue, "items", 0) or 0)
+    if index < min_insert:
+        cur = getattr(queue, "current_index", None)
+        raise ToolError(
+            f"Index {index} is before the next insertable position ({min_insert}). "
+            f"Current playback index is {cur!r}; only up-next rows can be inserted."
+        )
+    if index > item_count:
+        raise ToolError(
+            f"Index {index} is out of range for queue {queue_id!r} "
+            f"(item_count={item_count}, valid range {min_insert}..{item_count})."
+        )
+    offset = _items_window_offset_for_index(index)
+    before_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
+    before_item_ids = frozenset(str(getattr(it, "queue_item_id", "")) for it in before_items)
+    try:
+        media_item = await mass.music.get_item_by_uri(uri)
+    except MusicAssistantError as err:
+        raise ToolError(str(err)) from err
+    try:
+        resolved = await mass.player_queues._resolve_media_items(media_item, queue_id=queue_id)
+    except InvalidDataError as err:
+        raise ToolError(str(err)) from err
+    queue_items = [
+        QueueItem.from_media_item(queue_id, cast("PlayableMediaItemType", x))
+        for x in resolved
+        if x and getattr(x, "available", True)
+    ]
+    if not queue_items:
+        raise ToolError("No playable items found")
+    await mass.player_queues.load(
+        queue_id,
+        queue_items,
+        insert_at_index=index,
+        keep_remaining=True,
+        keep_played=True,
+        shuffle=False,
+    )
+    after_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
+    # A container URI (album / playlist) expands to per-track rows, so match on
+    # the resolved track URIs as well as the requested URI.
+    resolved_uris = frozenset(
+        str(getattr(x, "uri", "")) for x in resolved if getattr(x, "uri", None)
+    )
+    added = resolve_added_queue_item(
+        after_items, uris=frozenset({uri}) | resolved_uris, before_item_ids=before_item_ids
+    )
+    if added is None:
+        raise ToolError(
+            f"Added {uri!r} to queue {queue_id!r} at index {index} "
+            "but could not locate the new queue row."
+        )
+    return AddToQueueResult(
+        item_id=str(getattr(added, "queue_item_id", "")),
+        uri=uri,
+        name=queue_item_display_name(added),
+        option=option,
+        index=index,
+    )
+
+
+def build_queue_server(
     mass: MusicAssistant,
     *,
     require_confirmation: bool = True,
@@ -274,79 +356,20 @@ def build_queue_server(  # noqa: PLR0915 -- one sub-server registers all queue t
             the next insertable position (after the current and buffered rows).
             Valid range is ``min_insert .. item_count`` inclusive.
         """
-        if index is not None:
-            queue = mass.player_queues.get(queue_id)
-            if queue is None:
-                raise ToolError(f"Queue {queue_id!r} not found.")
-            if option in ("replace", "replace_next"):
-                raise ToolError(
-                    "``replace`` and ``replace_next`` cannot be combined with ``index``."
-                )
-            min_insert = _min_insert_index(queue)
-            all_items = mass.player_queues.items(queue_id)
-            item_count = len(all_items)
-            if index < min_insert:
-                cur = getattr(queue, "current_index", None)
-                raise ToolError(
-                    f"Index {index} is before the next insertable position ({min_insert}). "
-                    f"Current playback index is {cur!r}; only up-next rows can be inserted."
-                )
-            if index > item_count:
-                raise ToolError(
-                    f"Index {index} is out of range for queue {queue_id!r} "
-                    f"(item_count={item_count}, valid range {min_insert}..{item_count})."
-                )
-            offset = _items_window_offset_for_index(index)
-            before_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
-            before_item_ids = frozenset(
-                str(getattr(it, "queue_item_id", "")) for it in before_items
-            )
-            try:
-                media_item = await mass.music.get_item_by_uri(uri)
-            except MusicAssistantError as err:
-                raise ToolError(str(err)) from err
-            try:
-                resolved = await mass.player_queues._resolve_media_items(
-                    media_item, queue_id=queue_id
-                )
-            except InvalidDataError as err:
-                raise ToolError(str(err)) from err
-            queue_items = [
-                QueueItem.from_media_item(queue_id, cast("PlayableMediaItemType", x))
-                for x in resolved
-                if x and getattr(x, "available", True)
-            ]
-            if not queue_items:
-                raise ToolError("No playable items found")
-            await mass.player_queues.load(
-                queue_id,
-                queue_items,
-                insert_at_index=index,
-                keep_remaining=True,
-                keep_played=True,
-                shuffle=False,
-            )
-            after_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
-            added = resolve_added_queue_item(after_items, uri, before_item_ids=before_item_ids)
-            if added is None:
-                raise ToolError(
-                    f"Added {uri!r} to queue {queue_id!r} at index {index} "
-                    "but could not locate the new queue row."
-                )
-            return AddToQueueResult(
-                item_id=str(getattr(added, "queue_item_id", "")),
-                uri=uri,
-                name=queue_item_display_name(added),
-                option=option,
-                index=index,
-            )
-
         # QueueOption._missing_ silently falls back to UNKNOWN for invalid values
-        # instead of raising ValueError, so we must validate explicitly.
+        # instead of raising ValueError, so validate explicitly — for the index
+        # path too, where an unvalidated option would otherwise be echoed back.
         queue_option = QueueOption(option)
         if queue_option is QueueOption.UNKNOWN:
             valid = ", ".join(f"``{e.value}``" for e in QueueOption if e is not QueueOption.UNKNOWN)
             raise ToolError(f"Invalid option {option!r}. Valid options: {valid}")
+
+        if index is not None:
+            if queue_option in {QueueOption.REPLACE, QueueOption.REPLACE_NEXT}:
+                raise ToolError(
+                    "``replace`` and ``replace_next`` cannot be combined with ``index``."
+                )
+            return await _add_to_queue_at_index(mass, queue_id, uri, option, index)
 
         if (
             queue_option in {QueueOption.REPLACE, QueueOption.REPLACE_NEXT}
@@ -362,8 +385,15 @@ def build_queue_server(  # noqa: PLR0915 -- one sub-server registers all queue t
         before_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
         before_item_ids = frozenset(str(getattr(it, "queue_item_id", "")) for it in before_items)
         await mass.player_queues.play_media(queue_id, uri, option=queue_option)
-        after_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=offset)
-        added = resolve_added_queue_item(after_items, uri, before_item_ids=before_item_ids)
+        # Re-read the queue after the add: an ``add`` onto a queue longer than
+        # MAX_QUEUE_ITEMS appends rows beyond the pre-add window, so recompute
+        # the offset from the updated total or the new tail is missed.
+        updated = mass.player_queues.get(queue_id)
+        after_offset = _queue_items_window_offset(updated, queue_option)
+        after_items = mass.player_queues.items(queue_id, limit=MAX_QUEUE_ITEMS, offset=after_offset)
+        added = resolve_added_queue_item(
+            after_items, uris=frozenset({uri}), before_item_ids=before_item_ids
+        )
         if added is None:
             raise ToolError(
                 f"Added {uri!r} to queue {queue_id!r} but could not locate the new queue row."
